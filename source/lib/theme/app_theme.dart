@@ -9,6 +9,12 @@ class AppColors {
   static const amoledSurface = Color(0xFF101414);
 }
 
+// One shared card shape, applied to each Card widget directly
+// (works on every Flutter version - no theme-class version issues)
+RoundedRectangleBorder cardShape() => RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(18),
+    );
+
 class AppTheme {
   static ThemeData get light => ThemeData(
         useMaterial3: true,
@@ -23,12 +29,6 @@ class AppTheme {
           foregroundColor: Color(0xFF1A2327),
           elevation: 0,
           centerTitle: true,
-        ),
-        cardTheme: CardThemeData(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
         ),
         floatingActionButtonTheme: const FloatingActionButtonThemeData(
           backgroundColor: AppColors.primary,
@@ -49,13 +49,6 @@ class AppTheme {
           foregroundColor: Color(0xFFE8EDEE),
           elevation: 0,
           centerTitle: true,
-        ),
-        cardTheme: CardThemeData(
-          color: AppColors.amoledSurface,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
         ),
         floatingActionButtonTheme: const FloatingActionButtonThemeData(
           backgroundColor: AppColors.primary,
