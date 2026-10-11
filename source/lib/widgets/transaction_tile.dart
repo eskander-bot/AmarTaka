@@ -3,7 +3,7 @@ import '../models/transaction.dart';
 import '../utils/formatters.dart';
 
 class TransactionTile extends StatelessWidget {
-  final Transaction txn;
+  final Txn txn;
   final VoidCallback onDelete;
 
   const TransactionTile({super.key, required this.txn, required this.onDelete});

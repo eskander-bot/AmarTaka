@@ -152,6 +152,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _HomeData {
   final Map<String, double> totals;
-  final List<Transaction> recent;
+  final List<Txn> recent;
   _HomeData({required this.totals, required this.recent});
 }

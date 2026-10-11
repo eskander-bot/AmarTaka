@@ -56,7 +56,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
     if (_category == null) return;
     await _db.insertTransaction(
-      Transaction(
+      Txn(
         amount: amount,
         category: _category!,
         note: _noteCtrl.text.trim(),

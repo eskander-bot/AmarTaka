@@ -1,6 +1,6 @@
 enum TxnType { income, expense }
 
-class Transaction {
+class Txn {
   final int? id;
   final double amount;
   final String category;
@@ -8,7 +8,7 @@ class Transaction {
   final DateTime date;
   final TxnType type;
 
-  Transaction({
+  Txn({
     this.id,
     required this.amount,
     required this.category,
@@ -26,7 +26,7 @@ class Transaction {
         'type': type.name,
       };
 
-  factory Transaction.fromMap(Map<String, dynamic> map) => Transaction(
+  factory Txn.fromMap(Map<String, dynamic> map) => Txn(
         id: map['id'] as int?,
         amount: (map['amount'] as num).toDouble(),
         category: map['category'] as String,

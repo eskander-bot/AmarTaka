@@ -38,15 +38,15 @@ class DbHelper {
     );
   }
 
-  Future<int> insertTransaction(Transaction t) async {
+  Future<int> insertTransaction(Txn t) async {
     final d = await db;
     return d.insert('transactions', t.toMap());
   }
 
-  Future<List<Transaction>> getTransactions({int? limit}) async {
+  Future<List<Txn>> getTransactions({int? limit}) async {
     final d = await db;
     final rows = await d.query('transactions', orderBy: 'date DESC', limit: limit);
-    return rows.map(Transaction.fromMap).toList();
+    return rows.map(Txn.fromMap).toList();
   }
 
   Future<int> deleteTransaction(int id) async {
