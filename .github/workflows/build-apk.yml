@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,27 +21,26 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Flutter
+      - name: Setup Flutter (pinned 3.24.0)
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.24.0
 
-      - name: Generate Flutter skeleton
+      - name: Create Flutter project skeleton
         run: flutter create --org com.meskander --project-name amartaka --platforms android .
 
-      - name: Set app name
-        run: sed -i 's/android:label="amartaka"/android:label="Amar Taka"/' android/app/src/main/AndroidManifest.xml
-
-      - name: Copy app source code
+      - name: Copy our app code over the skeleton
         run: |
           rm -rf lib
-          cp -r source/lib lib
+          cp -r source/lib/. lib/
+          rm -rf source
 
-      - name: Add dependencies
-        run: flutter pub add sqflite path intl
+      - name: Get dependencies
+        run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Publish APK to Release
         uses: softprops/action-gh-release@v2
