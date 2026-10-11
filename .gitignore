@@ -1,0 +1,8 @@
+.build/
+.dart_tool/
+build/
+*.jks
+*.keystore
+key.properties
+local.properties
+__pycache__/

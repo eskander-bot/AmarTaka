@@ -1,84 +1,76 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/transaction.dart';
+import '../utils/formatters.dart';
 
 class DbHelper {
   DbHelper._();
-  static final DbHelper instance = DbHelper._();
-
-  static Database? _db;
-
-  Future<Database> get db async => _db ??= await _open();
-
-  Future<Database> _open() async {
-    final dir = await getDatabasesPath();
-    return openDatabase(
-      join(dir, 'amar_taka.db'),
-      version: 1,
-      onCreate: (database, version) async {
-        await database.execute(
-          'CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, amount REAL NOT NULL, category TEXT NOT NULL, note TEXT, date TEXT NOT NULL, type TEXT NOT NULL)',
-        );
-        await database.execute(
-          'CREATE TABLE categories(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, type TEXT NOT NULL)',
-        );
-        const expenseCats = [
-          'Bazar', 'Transport', 'Bills', 'Health', 'Education', 'Entertainment', 'Misc',
-        ];
-        const incomeCats = [
-          'Salary', 'Freelance', 'Business', 'Gift', 'Misc',
-        ];
-        for (final c in expenseCats) {
-          await database.insert('categories', {'name': c, 'type': 'expense'});
-        }
-        for (final c in incomeCats) {
-          await database.insert('categories', {'name': c, 'type': 'income'});
-        }
-      },
-    );
+  static final instance = DbHelper._();
+  Future<Database>? _opening;
+  Future<Database> get db => _opening ??= _open().catchError((Object e) { _opening = null; throw e; });
+  Future<Database> _open() async => openDatabase(join(await getDatabasesPath(), 'amar_taka.db'), version:2, onCreate:create, onUpgrade:upgrade);
+  static Future<void> create(Database d, int version) async {
+    await d.execute('CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, amount_minor INTEGER NOT NULL CHECK(amount_minor > 0), category TEXT NOT NULL, note TEXT NOT NULL DEFAULT "", date TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ("income","expense")))');
+    await d.execute('CREATE TABLE categories(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, type TEXT NOT NULL, UNIQUE(name,type))');
+    for (final type in TxnType.values) {
+      final cats = type == TxnType.income ? ['Salary','Freelance','Business','Gift','Misc'] : ['Bazar','Transport','Bills','Health','Education','Entertainment','Misc'];
+      for (final c in cats) { await d.insert('categories', {'name':c,'type':type.name}); }
+    }
+    await _extras(d);
   }
-
-  Future<int> insertTransaction(Txn t) async {
-    final d = await db;
-    return d.insert('transactions', t.toMap());
+  static Future<void> upgrade(Database d, int old, int version) async {
+    if (old < 2) {
+      // Preserve existing IDs and records; convert taka to integer paisa once.
+      await d.execute('ALTER TABLE transactions RENAME TO transactions_v1');
+      await d.execute('CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, amount_minor INTEGER NOT NULL CHECK(amount_minor > 0), category TEXT NOT NULL, note TEXT NOT NULL DEFAULT "", date TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ("income","expense")))');
+      await d.execute('INSERT INTO transactions SELECT id, CAST(ROUND(amount * 100) AS INTEGER), category, COALESCE(note,""), date, type FROM transactions_v1');
+      await d.execute('DROP TABLE transactions_v1');
+      await _extras(d);
+    }
   }
-
-  Future<List<Txn>> getTransactions({int? limit}) async {
+  static Future<void> _extras(Database d) async {
+    await d.execute('CREATE INDEX transactions_date ON transactions(date)');
+    await d.execute('CREATE TABLE budgets(month TEXT PRIMARY KEY, amount_minor INTEGER NOT NULL CHECK(amount_minor > 0))');
+    await d.execute('CREATE TABLE goals(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, target_minor INTEGER NOT NULL CHECK(target_minor > 0), saved_minor INTEGER NOT NULL DEFAULT 0 CHECK(saved_minor >= 0), note TEXT NOT NULL DEFAULT "")');
+    await d.execute('CREATE TABLE notes(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, body TEXT NOT NULL, updated TEXT NOT NULL)');
+    await d.execute('CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+  }
+  Future<void> saveTransaction(Txn t) async {
     final d = await db;
-    final rows = await d.query('transactions', orderBy: 'date DESC', limit: limit);
+    if (t.id == null) { await d.insert('transactions', t.toMap()..remove('id')); }
+    else { await d.update('transactions', t.toMap()..remove('id'), where:'id = ?', whereArgs:[t.id]); }
+  }
+  Future<List<Txn>> getTransactions({DateTime? month}) async {
+    final rows = await (await db).query('transactions', where:month == null ? null : 'date >= ? AND date < ?', whereArgs:month == null ? null : [DateTime(month.year,month.month).toIso8601String(),DateTime(month.year,month.month+1).toIso8601String()], orderBy:'date DESC, id DESC');
     return rows.map(Txn.fromMap).toList();
   }
-
-  Future<int> deleteTransaction(int id) async {
+  Future<void> deleteTransaction(int id) async { await (await db).delete('transactions',where:'id = ?',whereArgs:[id]); }
+  Future<List<String>> getCategories(TxnType type) async => (await (await db).query('categories',where:'type = ?',whereArgs:[type.name],orderBy:'id')).map((m) => m['name'] as String).toList();
+  Future<void> addCategory(String name, TxnType type) async {
     final d = await db;
-    return d.delete('transactions', where: 'id = ?', whereArgs: [id]);
+    if ((await d.query('categories',where:'name = ? AND type = ?',whereArgs:[name,type.name])).isEmpty) { await d.insert('categories',{'name':name,'type':type.name}); }
   }
-
-  Future<Map<String, double>> getMonthTotals() async {
+  Future<int?> budget(DateTime month) async {
+    final rows = await (await db).query('budgets',where:'month = ?',whereArgs:[monthKey(month)]);
+    return rows.isEmpty ? null : rows.first['amount_minor'] as int;
+  }
+  Future<void> setBudget(DateTime month,int minor) async { await (await db).insert('budgets',{'month':monthKey(month),'amount_minor':minor},conflictAlgorithm:ConflictAlgorithm.replace); }
+  Future<List<Map<String,Object?>>> items(String table) async {
+    if (!['goals','notes'].contains(table)) throw ArgumentError('Invalid table');
+    return (await db).query(table,orderBy:'id DESC');
+  }
+  Future<void> saveItem(String table,Map<String,Object?> values,{int? id}) async {
+    if (!['goals','notes'].contains(table)) throw ArgumentError('Invalid table');
     final d = await db;
-    final now = DateTime.now();
-    final rows = await d.query('transactions');
-    double income = 0, expense = 0;
-    for (final r in rows) {
-      final date = DateTime.parse(r['date'] as String);
-      if (date.year != now.year || date.month != now.month) continue;
-      final amt = (r['amount'] as num).toDouble();
-      if (r['type'] == 'income') {
-        income += amt;
-      } else {
-        expense += amt;
-      }
-    }
-    return {'income': income, 'expense': expense};
+    if (id == null) { await d.insert(table,values); } else { await d.update(table,values,where:'id = ?',whereArgs:[id]); }
   }
-
-  Future<List<String>> getCategories(TxnType type) async {
-    final d = await db;
-    final rows = await d.query(
-      'categories',
-      where: 'type = ?',
-      whereArgs: [type.name],
-    );
-    return rows.map((r) => r['name'] as String).toList();
+  Future<void> deleteItem(String table,int id) async {
+    if (!['goals','notes'].contains(table)) throw ArgumentError('Invalid table');
+    await (await db).delete(table,where:'id = ?',whereArgs:[id]);
   }
+  Future<String?> setting(String key) async {
+    final rows = await (await db).query('settings',where:'key = ?',whereArgs:[key]);
+    return rows.isEmpty ? null : rows.first['value'] as String;
+  }
+  Future<void> setSetting(String key,String value) async { await (await db).insert('settings',{'key':key,'value':value},conflictAlgorithm:ConflictAlgorithm.replace); }
 }
