@@ -25,5 +25,6 @@ class _LockScreenState extends State<LockScreen> {
     const Icon(Icons.account_balance_wallet_outlined,size:56),const SizedBox(height:20),const Text('Amar Taka',style:TextStyle(fontSize:30,fontWeight:FontWeight.bold)),const Text('by MEskander'),const SizedBox(height:32),
     TextField(controller:_pin,obscureText:true,enableSuggestions:false,autocorrect:false,keyboardType:TextInputType.number,maxLength:6,decoration:InputDecoration(labelText:'আপনার ৬ সংখ্যার PIN',errorText:_error),onSubmitted:(_) => _unlock()),
     const SizedBox(height:16),FilledButton(onPressed:_busy ? null : _unlock,child:Text(_busy ? 'অপেক্ষা করুন…' : 'আনলক করুন')),
-  ]))))));
+  ])))))));
 }
+
