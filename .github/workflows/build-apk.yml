@@ -36,8 +36,8 @@ jobs:
           cp -r source/lib/. lib/
           rm -rf source
 
-      - name: Get dependencies
-        run: flutter pub get
+      - name: Add required dependencies
+        run: flutter pub add sqflite path intl
 
       - name: Build APK
         run: flutter build apk --release --no-tree-shake-icons
