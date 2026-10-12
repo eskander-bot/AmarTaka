@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import '../utils/formatters.dart';
 import 'portfolio.dart';
 import 'holding_editor.dart';
+import '../widgets/wealth_cards.dart';
 
 const financeIcons={'cash':Icons.wallet_outlined,'bank':Icons.account_balance_outlined,'dps':Icons.savings_outlined,'fdr':Icons.lock_clock_outlined,'certificate':Icons.description_outlined,'investment':Icons.trending_up,'lent':Icons.call_made,'borrowed':Icons.call_received};
 
 class FinanceScreen extends StatefulWidget {
   final Future<Portfolio> Function()? loader;
-  const FinanceScreen({super.key,this.loader});
+  final bool savingsOnly;
+  const FinanceScreen({super.key,this.loader,this.savingsOnly=false});
   @override State<FinanceScreen> createState()=>_FinanceScreenState();
 }
 class _FinanceScreenState extends State<FinanceScreen> {
@@ -20,7 +22,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
   Future<void> _run(Future<void> Function() action) async {try{await action();await _load();}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e is FormatException?e.message:'কাজটি সম্পন্ন হয়নি। আবার চেষ্টা করুন।')));}}
   Future<void> _edit(String kind,[Record? record]) async {await Navigator.push(context,MaterialPageRoute(builder:(_)=>HoldingEditor(kind:kind,record:record)));if(mounted)await _load();}
   Future<void> _add() async {
-    final kind=_kind??await showModalBottomSheet<String>(context:context,isScrollControlled:true,builder:(ctx)=>SafeArea(child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[const Padding(padding:EdgeInsets.all(18),child:Text('কোন হিসাব যোগ করবেন?',style:TextStyle(fontSize:20,fontWeight:FontWeight.w600))),...financeKinds.map((k)=>ListTile(leading:Icon(financeIcons[k]),title:Text(financeLabels[k]!),onTap:()=>Navigator.pop(ctx,k)))]))));
+    final kind=_kind??await showModalBottomSheet<String>(context:context,isScrollControlled:true,builder:(ctx)=>SafeArea(child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[const Padding(padding:EdgeInsets.all(18),child:Text('কোন হিসাব যোগ করবেন?',style:TextStyle(fontSize:20,fontWeight:FontWeight.w600))),...(widget.savingsOnly?['dps','fdr','certificate']:financeKinds).map((k)=>ListTile(leading:Icon(financeIcons[k]),title:Text(financeLabels[k]!),onTap:()=>Navigator.pop(ctx,k)))]))));
     if(kind!=null && mounted)await _edit(kind);
   }
   Future<bool> _confirm(String text) async=>await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('নিশ্চিত করুন'),content:Text(text),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('বাদ দিন')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('নিশ্চিত'))]))??false;
@@ -37,7 +39,16 @@ class _FinanceScreenState extends State<FinanceScreen> {
     if(action=='history' && mounted)await Navigator.push(context,MaterialPageRoute(builder:(_)=>AccountHistory(portfolio:_data,account:r)));
   }
   Widget _metric(String title,int amount,{bool primary=false})=>Card(color:primary?Theme.of(context).colorScheme.primaryContainer:null,child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(title),const SizedBox(height:6),Text(formatMinor(amount),style:Theme.of(context).textTheme.headlineSmall)])));
-  Widget _card(Record r){
+  Widget _card(Record r) {
+    if (!isSaving(r)) return _detailCard(r);
+    return Card(child: ExpansionTile(
+      tilePadding:const EdgeInsets.symmetric(horizontal:18,vertical:6),
+      shape:const Border(),collapsedShape:const Border(),
+      title:SavingSummary(record:r),
+      children:[_detailCard(r)],
+    ));
+  }
+  Widget _detailCard(Record r){
     final kind=field(r,'kind'),amount=_data.value(r);
     final subtitle=[field(r,'institution'),field(r,'subtype')].where((s)=>s.isNotEmpty).join(' • ');
     return Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
@@ -76,12 +87,12 @@ class _FinanceScreenState extends State<FinanceScreen> {
     ])));
   }
   @override Widget build(BuildContext context){
-    final rows=_kind==null?_data.holdings:_data.ofKind(_kind!);
-    return Scaffold(appBar:AppBar(title:const Text('সম্পদ ও দায়')),floatingActionButton:FloatingActionButton.extended(onPressed:_add,icon:const Icon(Icons.add),label:const Text('হিসাব যোগ')),body:_loading?const Center(child:CircularProgressIndicator()):_error!=null?Center(child:TextButton(onPressed:_load,child:Text('$_error আবার চেষ্টা করুন'))):RefreshIndicator(onRefresh:_load,child:ListView(padding:const EdgeInsets.fromLTRB(18,10,18,110),children:[
-      _metric('নিট সম্পদ',_data.netWorth,primary:true),
+    final rows=(_kind==null?_data.holdings:_data.ofKind(_kind!)).where((r)=>!widget.savingsOnly||isSaving(r));
+    return Scaffold(appBar:AppBar(title:Text(widget.savingsOnly?'সঞ্চয়':'সম্পদ ও দায়')),floatingActionButton:FloatingActionButton.extended(onPressed:_add,icon:const Icon(Icons.add),label:const Text('হিসাব যোগ')),body:_loading?const Center(child:CircularProgressIndicator()):_error!=null?Center(child:TextButton(onPressed:_load,child:Text('$_error আবার চেষ্টা করুন'))):RefreshIndicator(onRefresh:_load,child:ListView(padding:const EdgeInsets.fromLTRB(18,10,18,110),children:[
+      _metric(widget.savingsOnly?'মোট সঞ্চয়':'নিট সম্পদ',widget.savingsOnly?_data.total('dps')+_data.total('fdr')+_data.total('certificate'):_data.netWorth,primary:true),
       Wrap(spacing:8,runSpacing:4,children:[Text('সম্পদ ${formatMinor(_data.assets)}'),Text('দায় ${formatMinor(_data.liabilities)}')]),
       const ExpansionTile(tilePadding:EdgeInsets.zero,title:Text('হিসাব কীভাবে হয়',style:TextStyle(fontSize:13)),children:[Padding(padding:EdgeInsets.only(bottom:16),child:Text('এখানে আপনার রাখা অ্যাকাউন্ট ও সম্পদের বর্তমান হিসাব। আয়–ব্যয়ের মোট ব্যালেন্স আবার যোগ হয় না। জমা/ট্রান্সফার ও ধার পরিশোধ দৈনিক আয়–ব্যয় বদলায় না। সঞ্চয়ে জমা মূলধন গণনা হয়; অনুমান করা লাভ নয়।',style:TextStyle(fontSize:12)))]),
-      Wrap(spacing:7,runSpacing:4,children:[ChoiceChip(label:const Text('সব'),selected:_kind==null,onSelected:(_)=>setState(()=>_kind=null)),...financeKinds.map((k)=>ChoiceChip(label:Text(financeLabels[k]!),selected:_kind==k,onSelected:(_)=>setState(()=>_kind=k)))]),
+      Wrap(spacing:7,runSpacing:4,children:[ChoiceChip(label:const Text('সব'),selected:_kind==null,onSelected:(_)=>setState(()=>_kind=null)),...(widget.savingsOnly?['dps','fdr','certificate']:financeKinds).map((k)=>ChoiceChip(label:Text(financeLabels[k]!),selected:_kind==k,onSelected:(_)=>setState(()=>_kind=k)))]),
       if(_kind!=null)_metric('${financeLabels[_kind]} মোট',_data.total(_kind!)),
       if(rows.isEmpty)const Padding(padding:EdgeInsets.symmetric(vertical:44),child:Text('এখনও হিসাব নেই। নিচে “হিসাব যোগ” চাপুন।',textAlign:TextAlign.center)),
       ...rows.map(_card),
