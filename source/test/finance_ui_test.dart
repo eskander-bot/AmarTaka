@@ -36,7 +36,11 @@ void main(){
   testWidgets('DPS form and charts remain usable at large text',(tester)async{
     await mount(tester,const HoldingEditor(kind:'dps'),small:true);
     await tester.drag(find.byType(ListView).first,const Offset(0,-650));await tester.pumpAndSettle();expect(tester.takeException(),isNull);
-    await mount(tester,Scaffold(body:ListView(children:[FinanceCharts(month:DateTime(2026,10),transactions:[Txn(amountMinor:10000,category:'Bazar',date:DateTime(2026,10,12),type:TxnType.expense)])])),small:true);
+    final chartBoundary=GlobalKey();
+    await mount(tester,Scaffold(body:ListView(children:[FinanceCharts(month:DateTime(2026,10),transactions:[Txn(amountMinor:10000,category:'Bazar',date:DateTime(2026,10,12),type:TxnType.expense)])])),small:true,key:chartBoundary);
     expect(tester.takeException(),isNull);
+    await tester.runAsync(()async{
+      final image=await (chartBoundary.currentContext!.findRenderObject() as RenderRepaintBoundary).toImage(pixelRatio:2);final bytes=await image.toByteData(format:ui.ImageByteFormat.png);Directory('build/ui-previews').createSync(recursive:true);File('build/ui-previews/charts-large-text.png').writeAsBytesSync(bytes!.buffer.asUint8List());image.dispose();
+    });
   });
 }
