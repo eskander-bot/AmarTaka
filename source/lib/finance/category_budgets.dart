@@ -3,6 +3,8 @@ import '../database/db_helper.dart';
 import '../models/transaction.dart';
 import '../utils/formatters.dart';
 import 'portfolio.dart';
+import '../widgets/wealth_cards.dart';
+import '../theme/app_theme.dart';
 
 class CategoryBudgetsScreen extends StatefulWidget {
   final DateTime month;
@@ -29,8 +31,20 @@ class _CategoryBudgetsScreenState extends State<CategoryBudgetsScreen> {
   }
   @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('ক্যাটাগরি বাজেট')),floatingActionButton:FloatingActionButton(onPressed:_loading?null:()=>_edit(),child:const Icon(Icons.add)),body:_loading?const Center(child:CircularProgressIndicator()):_error!=null?Center(child:TextButton(onPressed:_load,child:Text(_error!))):ListView(padding:const EdgeInsets.fromLTRB(20,8,20,100),children:[
     Row(children:[IconButton(onPressed:(){setState((){_month=DateTime(_month.year,_month.month-1);_loading=true;});_load();},icon:const Icon(Icons.chevron_left)),Expanded(child:Text(monthLabel(_month),textAlign:TextAlign.center)),IconButton(onPressed:(){setState((){_month=DateTime(_month.year,_month.month+1);_loading=true;});_load();},icon:const Icon(Icons.chevron_right))]),
-    const Text('লেনদেন থেকে খরচ নিজে হিসাব হবে। একই মাস ও ক্যাটাগরিতে নতুন বাজেট দিলে আগের সীমা বদলাবে। মোট মাসিক বাজেট আলাদাভাবে থাকবে।'),
+    Padding(padding:const EdgeInsets.only(bottom:12),child:Text('${formatMinor(_budgets.fold<int>(0,(sum,r)=>sum+number(r,'amount_minor')))} পরিকল্পিত',style:Theme.of(context).textTheme.bodySmall)),
+    if(_budgets.any((r)=>_spent(field(r,'category'))>=number(r,'amount_minor')*.8))
+      Container(margin:const EdgeInsets.only(bottom:14),padding:const EdgeInsets.all(14),decoration:BoxDecoration(color:WealthStyle.amber.withValues(alpha:.10),borderRadius:BorderRadius.circular(16),border:Border.all(color:WealthStyle.amber.withValues(alpha:.25))),child:Row(children:[Icon(Icons.warning_amber_rounded,size:18,color:WealthStyle.accent(context,'cash')),const SizedBox(width:10),Expanded(child:Text('কিছু ক্যাটাগরিতে বাজেটের ৮০% বা বেশি খরচ হয়েছে।',style:TextStyle(color:WealthStyle.accent(context,'cash'),fontSize:12)))])),
     if(_budgets.isEmpty)const Padding(padding:EdgeInsets.all(32),child:Text('এই মাসে ক্যাটাগরি বাজেট নেই। + চাপুন।')),
-    ..._budgets.map((r){final spent=_spent(field(r,'category')),limit=number(r,'amount_minor'),over=spent>limit;return Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[Expanded(child:Text(categoryLabel(field(r,'category')),style:Theme.of(context).textTheme.titleMedium)),IconButton(tooltip:'বাজেট সম্পাদনা',onPressed:()=>_edit(r),icon:const Icon(Icons.edit_outlined)),IconButton(tooltip:'বাজেট মুছুন',onPressed:()=>_delete(r),icon:const Icon(Icons.delete_outline))]),Text('${formatMinor(spent)} / ${formatMinor(limit)}'),const SizedBox(height:12),LinearProgressIndicator(value:(spent/limit).clamp(0.0,1.0),color:over?Theme.of(context).colorScheme.error:null),const SizedBox(height:10),Text(over?'সীমার বেশি ${formatMinor(spent-limit)}':'বাকি ${formatMinor(limit-spent)}',style:TextStyle(color:over?Theme.of(context).colorScheme.error:null))])));}),
+    ..._budgets.map((r){
+      final category=field(r,'category'),spent=_spent(category),limit=number(r,'amount_minor');
+      final ratio=spent/limit;
+      final color=ratio>=1?AppColors.expenseFor(context):ratio>=.8?WealthStyle.accent(context,'cash'):AppColors.incomeFor(context);
+      return Card(child:InkWell(borderRadius:BorderRadius.circular(20),onTap:()=>_edit(r),child:Padding(padding:const EdgeInsets.fromLTRB(16,12,12,16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Row(children:[Icon(WealthStyle.categoryIcon(category),size:19),const SizedBox(width:8),Expanded(child:Text(categoryLabel(category),style:Theme.of(context).textTheme.titleMedium)),PopupMenuButton<String>(tooltip:'বাজেটের অপশন',onSelected:(v){if(v=='edit'){_edit(r);}else{_delete(r);}},itemBuilder:(_)=>const [PopupMenuItem(value:'edit',child:Text('সম্পাদনা')),PopupMenuItem(value:'delete',child:Text('মুছুন'))])]),
+        Text('${formatMinor(spent)} / ${formatMinor(limit)}',style:Theme.of(context).textTheme.bodySmall),const SizedBox(height:10),
+        LinearProgressIndicator(value:ratio.clamp(0.0,1.0),minHeight:6,borderRadius:BorderRadius.circular(8),color:color),
+        const SizedBox(height:8),Text(spent>limit?'সীমার বেশি ${formatMinor(spent-limit)}':'বাকি ${formatMinor(limit-spent)}',style:Theme.of(context).textTheme.bodySmall?.copyWith(color:color)),
+      ]))));
+    }),
   ]));
 }
