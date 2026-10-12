@@ -4,20 +4,20 @@ import '../theme/app_theme.dart';
 
 class BalanceCard extends StatefulWidget {
   final int balance;
-  const BalanceCard({super.key,required this.balance});
+  final String label, caption;
+  const BalanceCard({super.key,required this.balance,this.label='মোট ব্যালেন্স',this.caption='সব সময়ের আয় ও ব্যয়ের হিসাব'});
   @override State<BalanceCard> createState() => _BalanceCardState();
 }
 class _BalanceCardState extends State<BalanceCard> {
   bool _visible = true;
   @override Widget build(BuildContext context) => Container(
     clipBehavior:Clip.antiAlias,
-    decoration:BoxDecoration(borderRadius:BorderRadius.circular(24),color:const Color(0xFF344ECC),boxShadow:[BoxShadow(color:const Color(0xFF344ECC).withValues(alpha:0.16),blurRadius:20,offset:const Offset(0,8))]),
+    decoration:BoxDecoration(borderRadius:BorderRadius.circular(24),gradient:const LinearGradient(begin:Alignment.topLeft,end:Alignment.bottomRight,colors:[Color(0xFF087D5C),Color(0xFF034331)])),
     child:Stack(children:[
-      Positioned(right:-30,top:-68,child:IgnorePointer(child:Container(width:210,height:210,decoration:BoxDecoration(shape:BoxShape.circle,border:Border.all(color:Colors.white.withValues(alpha:0.06),width:28))))),
       Padding(padding:const EdgeInsets.fromLTRB(22,16,22,20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Row(children:[const Icon(Icons.account_balance_wallet_outlined,color:Color(0xFFD0D9FF),size:18),const SizedBox(width:8),const Expanded(child:Text('মোট ব্যালেন্স',style:TextStyle(color:Color(0xFFDCE3FF),fontSize:14))),IconButton(tooltip:_visible ? 'ব্যালেন্স আড়াল করুন' : 'ব্যালেন্স দেখুন',onPressed:() => setState(() => _visible = !_visible),icon:Icon(_visible ? Icons.visibility_outlined : Icons.visibility_off_outlined,color:const Color(0xFFDCE3FF),size:19))]),
-        Semantics(label:_visible ? 'মোট ব্যালেন্স ${formatMinor(widget.balance)}' : 'ব্যালেন্স আড়াল করা আছে',excludeSemantics:true,child:FittedBox(fit:BoxFit.scaleDown,alignment:Alignment.centerLeft,child:Text(_visible ? formatMinor(widget.balance) : '৳ ••••••',maxLines:1,style:const TextStyle(color:Colors.white,fontSize:34,height:1.35,fontWeight:FontWeight.w600,letterSpacing:0.2)))),
-        const SizedBox(height:14),Row(children:[Container(width:6,height:6,decoration:const BoxDecoration(color:Color(0xFF91E8CA),shape:BoxShape.circle)),const SizedBox(width:7),const Expanded(child:Text('সব সময়ের আয় ও ব্যয়ের হিসাব',style:TextStyle(color:Color(0xFFD0D9FF),fontSize:11))),const Icon(Icons.shield_outlined,size:16,color:Color(0xFFD0D9FF))]),
+        Row(children:[const Icon(Icons.account_balance_wallet_outlined,color:Color(0xFFC6F3DF),size:18),const SizedBox(width:8),Expanded(child:Text(widget.label,style:const TextStyle(color:Color(0xFFC6F3DF),fontSize:14))),IconButton(tooltip:_visible ? 'ব্যালেন্স আড়াল করুন' : 'ব্যালেন্স দেখুন',onPressed:() => setState(() => _visible = !_visible),icon:Icon(_visible ? Icons.visibility_outlined : Icons.visibility_off_outlined,color:const Color(0xFFC6F3DF),size:19))]),
+        Semantics(label:_visible ? '${widget.label} ${formatMinor(widget.balance)}' : 'ব্যালেন্স আড়াল করা আছে',excludeSemantics:true,child:FittedBox(fit:BoxFit.scaleDown,alignment:Alignment.centerLeft,child:Text(_visible ? formatMinor(widget.balance) : '৳ ••••••',maxLines:1,style:const TextStyle(color:Colors.white,fontSize:34,height:1.35,fontWeight:FontWeight.w600,letterSpacing:0.2)))),
+        const SizedBox(height:14),Row(children:[Container(width:6,height:6,decoration:const BoxDecoration(color:Color(0xFF91E8CA),shape:BoxShape.circle)),const SizedBox(width:7),Expanded(child:Text(widget.caption,style:const TextStyle(color:Color(0xFFC6F3DF),fontSize:11))),const Icon(Icons.shield_outlined,size:16,color:Color(0xFFC6F3DF))]),
       ])),
     ]),
   );
