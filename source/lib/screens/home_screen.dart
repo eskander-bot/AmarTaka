@@ -3,12 +3,20 @@ import '../database/db_helper.dart';
 import '../models/transaction.dart';
 import '../utils/formatters.dart';
 import '../theme/app_theme.dart';
+import '../widgets/finance_cards.dart';
 import 'add_transaction_screen.dart';
 import 'item_editor.dart';
 import 'settings_screen.dart';
 
+class LedgerOverview {
+  final List<Txn> transactions;
+  final List<Map<String,Object?>> goals;
+  final int? budget;
+  const LedgerOverview({required this.transactions,this.goals = const [],this.budget});
+}
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final Future<LedgerOverview> Function(DateTime month)? loadData;
+  const HomeScreen({super.key,this.loadData});
   @override State<HomeScreen> createState() => _HomeScreenState();
 }
 class _HomeScreenState extends State<HomeScreen> {
@@ -21,9 +29,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _load() async {
     final request = ++_request;
     try {
-      final all = await DbHelper.instance.getTransactions();
-      final goals = await DbHelper.instance.items('goals');
-      final budget = await DbHelper.instance.budget(_month);
+      final data = widget.loadData == null ? LedgerOverview(transactions:await DbHelper.instance.getTransactions(),goals:await DbHelper.instance.items('goals'),budget:await DbHelper.instance.budget(_month)) : await widget.loadData!(_month);
+      final all = data.transactions; final goals = data.goals; final budget = data.budget;
       if (!mounted || request != _request) return;
       setState(() { _all = all; _goals = goals; _budget = budget; _loading = false; _error = null; });
     } catch (_) { if (mounted && request == _request) setState(() { _loading = false; _error = 'হিসাব পড়া যায়নি। আবার চেষ্টা করুন।'; }); }
@@ -31,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Txn> get _monthly => _all.where((t) => t.date.year == _month.year && t.date.month == _month.month).toList();
   int _sum(Iterable<Txn> rows,TxnType type) => rows.where((t) => t.type == type).fold(0,(n,t) => n+t.amountMinor);
   void _message(String s) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s))); }
-  Future<void> _editTransaction([Txn? t]) async { await Navigator.push(context,MaterialPageRoute(builder:(_) => AddTransactionScreen(transaction:t))); if (mounted) await _load(); }
+  Future<void> _editTransaction([Txn? t,TxnType? initialType]) async { await Navigator.push(context,MaterialPageRoute(builder:(_) => AddTransactionScreen(transaction:t,initialType:initialType ?? TxnType.expense))); if (mounted) await _load(); }
   Future<void> _editGoal([Map<String,Object?>? m]) async { await Navigator.push(context,MaterialPageRoute(builder:(_) => ItemEditor(goal:true,item:m))); if (mounted) await _load(); }
   Future<bool> _confirm(String text) async => await showDialog<bool>(context:context,builder:(ctx) => AlertDialog(title:const Text('মুছে ফেলবেন?'),content:Text(text),actions:[TextButton(onPressed:() => Navigator.pop(ctx,false),child:const Text('না')),FilledButton(onPressed:() => Navigator.pop(ctx,true),child:const Text('মুছুন'))])) ?? false;
   Future<void> _delete(Txn t) async {
@@ -46,36 +53,42 @@ class _HomeScreenState extends State<HomeScreen> {
     if (amount == null) return;
     try { await DbHelper.instance.setBudget(_month,amount); await _load(); } catch (_) { _message('বাজেট সংরক্ষণ হয়নি।'); }
   }
-  Widget _monthPicker() => Row(mainAxisAlignment:MainAxisAlignment.center,children:[IconButton(tooltip:'আগের মাস',onPressed:() { setState(() => _month = DateTime(_month.year,_month.month-1)); _load(); },icon:const Icon(Icons.chevron_left)),Expanded(child:Text(monthLabel(_month),textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.w600))),IconButton(tooltip:'পরের মাস',onPressed:() { setState(() => _month = DateTime(_month.year,_month.month+1)); _load(); },icon:const Icon(Icons.chevron_right))]);
+  Widget _monthPicker() => Padding(padding:const EdgeInsets.only(top:18,bottom:8),child:Row(children:[
+    const Icon(Icons.calendar_month_outlined,size:17),const SizedBox(width:7),Expanded(child:Text(monthLabel(_month),style:Theme.of(context).textTheme.titleMedium)),
+    IconButton(tooltip:'আগের মাস',visualDensity:VisualDensity.compact,onPressed:() { setState(() => _month = DateTime(_month.year,_month.month-1)); _load(); },icon:const Icon(Icons.chevron_left,size:21)),
+    IconButton(tooltip:'পরের মাস',visualDensity:VisualDensity.compact,onPressed:() { setState(() => _month = DateTime(_month.year,_month.month+1)); _load(); },icon:const Icon(Icons.chevron_right,size:21)),
+  ]));
   Widget _empty(String text,IconData icon) => Padding(padding:const EdgeInsets.symmetric(vertical:40,horizontal:20),child:Column(children:[Icon(icon,size:40,color:Theme.of(context).colorScheme.outline),const SizedBox(height:14),Text(text,textAlign:TextAlign.center)]));
-  Widget _heading(String title,{Widget? action}) => Padding(padding:const EdgeInsets.only(top:22,bottom:12),child:Row(children:[Expanded(child:Text(title,style:Theme.of(context).textTheme.titleLarge)),if (action != null) action]));
+  Widget _heading(String title,{Widget? action}) => Padding(padding:const EdgeInsets.only(top:14,bottom:4),child:Row(children:[Expanded(child:Text(title,style:Theme.of(context).textTheme.titleLarge)),if (action != null) action]));
   Widget _transaction(Txn t) {
     final income = t.type == TxnType.income;
-    final color = income ? AppColors.income : AppColors.expense;
-    return Card(child:InkWell(borderRadius:BorderRadius.circular(22),onTap:() => _editTransaction(t),child:Padding(padding:const EdgeInsets.fromLTRB(14,14,4,14),child:Row(children:[
-      CircleAvatar(backgroundColor:color.withValues(alpha:0.12),child:Icon(income ? Icons.south_west : Icons.north_east,color:color)),const SizedBox(width:12),
-      Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(categoryLabel(t.category),style:const TextStyle(fontWeight:FontWeight.w600)),Text('${formatDate(t.date)}${t.note.isEmpty ? '' : ' • ${t.note}'}',maxLines:2,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.bodySmall),const SizedBox(height:4),Text('${income ? '+' : '−'} ${formatMinor(t.amountMinor)}',style:TextStyle(color:color,fontWeight:FontWeight.bold))])),
-      PopupMenuButton<String>(tooltip:'লেনদেনের অপশন',onSelected:(v) { if (v == 'edit') { _editTransaction(t); } else { _delete(t); } },itemBuilder:(_) => const [PopupMenuItem(value:'edit',child:Text('সম্পাদনা')),PopupMenuItem(value:'delete',child:Text('মুছুন'))]),
-    ]))));
+    final color = income ? AppColors.incomeFor(context) : AppColors.expenseFor(context);
+    final icons = <String,IconData>{'Bazar':Icons.shopping_bag_outlined,'Transport':Icons.directions_bus_outlined,'Bills':Icons.receipt_outlined,'Health':Icons.favorite_border,'Education':Icons.school_outlined,'Salary':Icons.work_outline,'Freelance':Icons.laptop_mac_outlined,'Gift':Icons.card_giftcard_outlined};
+    final amount = Text('${income ? '+' : '−'} ${formatMinor(t.amountMinor)}',style:TextStyle(color:color,fontSize:14,fontWeight:FontWeight.w600));
+    return Card(child:InkWell(borderRadius:BorderRadius.circular(20),onTap:() => _editTransaction(t),child:Padding(padding:const EdgeInsets.fromLTRB(14,13,0,13),child:LayoutBuilder(builder:(context,box) {
+      final wide = box.maxWidth > 330 && MediaQuery.textScalerOf(context).scale(14) < 19;
+      return Row(children:[
+        Container(width:42,height:42,decoration:BoxDecoration(color:color.withValues(alpha:0.10),borderRadius:BorderRadius.circular(13)),child:Icon(icons[t.category] ?? (income ? Icons.south_west_rounded : Icons.north_east_rounded),color:color,size:21)),const SizedBox(width:12),
+        Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(categoryLabel(t.category),style:Theme.of(context).textTheme.titleMedium),const SizedBox(height:3),Text('${formatDate(t.date)}${t.note.isEmpty ? '' : ' • ${t.note}'}',maxLines:1,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.bodySmall),if (!wide) ...[const SizedBox(height:5),amount]])),
+        if (wide) ...[const SizedBox(width:8),amount],
+        PopupMenuButton<String>(tooltip:'লেনদেনের অপশন',icon:Icon(Icons.more_vert,size:19,color:Theme.of(context).colorScheme.onSurfaceVariant),onSelected:(v) { if (v == 'edit') { _editTransaction(t); } else { _delete(t); } },itemBuilder:(_) => const [PopupMenuItem(value:'edit',child:Text('সম্পাদনা')),PopupMenuItem(value:'delete',child:Text('মুছুন'))]),
+      ]);
+    }))));
   }
-  Widget _budgetCard() {
-    final spent = _sum(_monthly,TxnType.expense);
-    return Card(child:Padding(padding:const EdgeInsets.all(20),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Row(children:[const Expanded(child:Text('মাসের বাজেট',style:TextStyle(fontWeight:FontWeight.bold))),TextButton(onPressed:_setBudget,child:Text(_budget == null ? 'নির্ধারণ' : 'বদলান'))]),
-      if (_budget == null) const Text('ব্যয়ের একটি সীমা ঠিক করে শুরু করুন।') else ...[
-        Text('${formatMinor(spent)} / ${formatMinor(_budget!)}'),const SizedBox(height:12),LinearProgressIndicator(value:(spent/_budget!).clamp(0.0,1.0),minHeight:8,borderRadius:BorderRadius.circular(4),color:spent > _budget! ? AppColors.expense : null),const SizedBox(height:12),Text(spent > _budget! ? 'সীমা ছাড়িয়েছে ${formatMinor(spent-_budget!)}' : 'বাকি আছে ${formatMinor(_budget!-spent)}'),
-      ],
-    ])));
-  }
+  Widget _budgetCard() => BudgetCard(spent:_sum(_monthly,TxnType.expense),budget:_budget,onEdit:_setBudget);
   List<Widget> _dashboard() {
     final income = _sum(_monthly,TxnType.income),expense = _sum(_monthly,TxnType.expense);
     final balance = _sum(_all,TxnType.income)-_sum(_all,TxnType.expense);
     return [
-      const SizedBox(height:10),Text('হিসাব থাকুক নিজের হাতে',style:Theme.of(context).textTheme.headlineSmall),const SizedBox(height:6),const Text('আপনার ফোনে, আপনার হিসাব।'),const SizedBox(height:22),
-      Container(padding:const EdgeInsets.all(24),decoration:BoxDecoration(color:const Color(0xFF244E40),borderRadius:BorderRadius.circular(26)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('সব লেনদেনের মোট ব্যালেন্স',style:TextStyle(color:Color(0xFFCEE0D7))),const SizedBox(height:8),FittedBox(fit:BoxFit.scaleDown,child:Text(formatMinor(balance),style:const TextStyle(color:Colors.white,fontSize:34,fontWeight:FontWeight.bold))),const SizedBox(height:14),const Row(children:[Icon(Icons.offline_pin_outlined,color:Color(0xFFCEE0D7),size:16),SizedBox(width:6),Text('অফলাইনে সংরক্ষিত',style:TextStyle(color:Color(0xFFCEE0D7)))] )])),
-      _monthPicker(),Wrap(spacing:12,runSpacing:12,children:[_total('মাসের আয়',income,AppColors.income),_total('মাসের ব্যয়',expense,AppColors.expense)]),const SizedBox(height:10),_budgetCard(),
+      const SizedBox(height:12),BalanceCard(balance:balance),const SizedBox(height:18),
+      QuickActions(onIncome:() => _editTransaction(null,TxnType.income),onExpense:() => _editTransaction(null,TxnType.expense)),
+      _monthPicker(),LayoutBuilder(builder:(context,box) {
+        final cards = [SummaryCard(label:'মাসের আয়',amount:income,income:true),SummaryCard(label:'মাসের ব্যয়',amount:expense,income:false)];
+        if (MediaQuery.textScalerOf(context).scale(14) > 22) return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:cards);
+        return Row(crossAxisAlignment:CrossAxisAlignment.start,children:[Expanded(child:cards[0]),const SizedBox(width:12),Expanded(child:cards[1])]);
+      }),const SizedBox(height:10),_budgetCard(),
       _heading('সাম্প্রতিক লেনদেন',action:TextButton(onPressed:() => setState(() => _tab = 1),child:const Text('সব দেখুন'))),
-      if (_monthly.isEmpty) _empty('এই মাসে হিসাব নেই।\n+ বাটনে প্রথম লেনদেন যোগ করুন।',Icons.receipt_long_outlined),..._monthly.take(8).map(_transaction),
+      if (_monthly.isEmpty) _empty('এখনও কোনো লেনদেন নেই।\nউপরে আয় বা ব্যয় যোগ করুন।',Icons.receipt_long_outlined),..._monthly.take(8).map(_transaction),
     ];
   }
   Widget _total(String title,int n,Color color) => Container(constraints:const BoxConstraints(minWidth:140),padding:const EdgeInsets.all(18),decoration:BoxDecoration(color:Theme.of(context).colorScheme.surface,borderRadius:BorderRadius.circular(18)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(title,style:TextStyle(color:color)),const SizedBox(height:6),Text(formatMinor(n),style:const TextStyle(fontWeight:FontWeight.bold,fontSize:18))]));
@@ -100,10 +113,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   @override Widget build(BuildContext context) {
     const labels = ['হোম','লেনদেন','পরিকল্পনা','রিপোর্ট','আরও'];
-    return Scaffold(appBar:AppBar(title:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(_tab == 0 ? 'Amar Taka' : labels[_tab]),if (_tab == 0) const Text('by MEskander',style:TextStyle(fontSize:11))]),actions:[IconButton(tooltip:'রিফ্রেশ',onPressed:_load,icon:const Icon(Icons.refresh))]),
-      bottomNavigationBar:NavigationBar(selectedIndex:_tab,onDestinationSelected:(i) => setState(() => _tab = i),destinations:const [NavigationDestination(icon:Icon(Icons.home_outlined),label:'হোম'),NavigationDestination(icon:Icon(Icons.receipt_long_outlined),label:'লেনদেন'),NavigationDestination(icon:Icon(Icons.savings_outlined),label:'পরিকল্পনা'),NavigationDestination(icon:Icon(Icons.bar_chart),label:'রিপোর্ট'),NavigationDestination(icon:Icon(Icons.tune),label:'আরও')]),
-      floatingActionButton:_tab <= 1 ? FloatingActionButton.extended(onPressed:() => _editTransaction(),icon:const Icon(Icons.add),label:const Text('লেনদেন')) : null,
-      body:_loading ? const Center(child:CircularProgressIndicator()) : _error != null ? Center(child:Column(mainAxisSize:MainAxisSize.min,children:[Text(_error!),TextButton(onPressed:_load,child:const Text('আবার চেষ্টা'))])) : _tab == 4 ? SettingsScreen(onDataChanged:_load) : RefreshIndicator(onRefresh:_load,child:ListView(padding:const EdgeInsets.fromLTRB(18,4,18,100),children:switch (_tab) { 0 => _dashboard(),1 => _history(),2 => _plans(),_ => _reports() })),
+    final cs = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar:AppBar(toolbarHeight:68,title:_tab == 0 ? Row(children:[
+        Container(width:38,height:38,decoration:BoxDecoration(color:cs.primaryContainer,borderRadius:BorderRadius.circular(12)),child:Icon(Icons.account_balance_wallet_rounded,color:cs.primary,size:21)),const SizedBox(width:11),
+        Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('Amar Taka',style:Theme.of(context).textTheme.titleLarge?.copyWith(fontSize:21,height:1.15)),Text('by MEskander',style:Theme.of(context).textTheme.bodySmall?.copyWith(fontSize:10))])),
+      ]) : Text(labels[_tab]),actions:[
+        Padding(padding:const EdgeInsets.only(right:12),child:IconButton.filledTonal(tooltip:'রিফ্রেশ',style:IconButton.styleFrom(backgroundColor:cs.surface,side:BorderSide(color:cs.outlineVariant)),onPressed:_load,icon:const Icon(Icons.refresh_rounded,size:20))),
+      ]),
+      bottomNavigationBar:DecoratedBox(decoration:BoxDecoration(border:Border(top:BorderSide(color:cs.outlineVariant))),child:NavigationBar(selectedIndex:_tab,onDestinationSelected:(i) => setState(() => _tab = i),destinations:const [
+        NavigationDestination(icon:Icon(Icons.home_outlined),selectedIcon:Icon(Icons.home_rounded),label:'হোম'),
+        NavigationDestination(icon:Icon(Icons.receipt_long_outlined),selectedIcon:Icon(Icons.receipt_long_rounded),label:'লেনদেন'),
+        NavigationDestination(icon:Icon(Icons.savings_outlined),selectedIcon:Icon(Icons.savings_rounded),label:'পরিকল্পনা'),
+        NavigationDestination(icon:Icon(Icons.bar_chart_rounded),label:'রিপোর্ট'),
+        NavigationDestination(icon:Icon(Icons.tune_rounded),label:'আরও'),
+      ])),
+      floatingActionButton:_tab == 1 ? FloatingActionButton(onPressed:() => _editTransaction(),tooltip:'নতুন লেনদেন',child:const Icon(Icons.add)) : null,
+      body:_loading ? const Center(child:CircularProgressIndicator()) : _error != null ? Center(child:Column(mainAxisSize:MainAxisSize.min,children:[Text(_error!),TextButton(onPressed:_load,child:const Text('আবার চেষ্টা'))])) : _tab == 4 ? SettingsScreen(onDataChanged:_load) : RefreshIndicator(onRefresh:_load,child:ListView(physics:const AlwaysScrollableScrollPhysics(),padding:EdgeInsets.fromLTRB(20,0,20,_tab == 1 ? 90 : 28),children:switch (_tab) { 0 => _dashboard(),1 => _history(),2 => _plans(),_ => _reports() })),
     );
   }
 }

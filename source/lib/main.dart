@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'database/db_helper.dart';
 import 'services/app_lock.dart';
@@ -21,7 +23,11 @@ class Preferences extends ChangeNotifier {
   }
   Future<void> refreshPin() async { pinEnabled = await AppLock.enabled(); notifyListeners(); }
 }
-void main() { WidgetsFlutterBinding.ensureInitialized(); runApp(const AmarTakaApp()); }
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* { yield LicenseEntryWithLineBreaks(['Hind Siliguri'],await rootBundle.loadString('assets/fonts/OFL.txt')); });
+  runApp(const AmarTakaApp());
+}
 class AmarTakaApp extends StatefulWidget {
   const AmarTakaApp({super.key});
   @override State<AmarTakaApp> createState() => _AmarTakaAppState();

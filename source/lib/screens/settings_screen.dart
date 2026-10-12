@@ -76,9 +76,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     const SizedBox(height:20),const Text('আপনার ডেটা',style:TextStyle(fontSize:20,fontWeight:FontWeight.w600)),
     const Padding(padding:EdgeInsets.symmetric(vertical:12),child:Text('JSON-এ সম্পূর্ণ backup; CSV-তে শুধু লেনদেনের রিপোর্ট। Export করা ফাইলে PIN বা encryption থাকে না—নিজের নিরাপদ জায়গায় রাখুন।')),
     Card(child:Column(children:[ListTile(leading:const Icon(Icons.save_alt),title:const Text('JSON backup রাখুন'),onTap:() => _run(() => _export(false))),ListTile(leading:const Icon(Icons.table_view_outlined),title:const Text('CSV রিপোর্ট নিন'),onTap:() => _run(() => _export(true))),ListTile(leading:const Icon(Icons.restore),title:const Text('JSON backup ফিরিয়ে আনুন'),onTap:() => _run(_restore))])),
-    const SizedBox(height:24),const Text('Amar Taka',style:TextStyle(fontSize:24,fontWeight:FontWeight.bold)),const Text('by MEskander • 0.2.0'),const SizedBox(height:12),
+    const SizedBox(height:24),const Text('Amar Taka',style:TextStyle(fontSize:24,fontWeight:FontWeight.bold)),const Text('by MEskander • 0.3.0'),const SizedBox(height:12),
     const Text('কোনো লগইন, ব্যাংক সংযোগ বা server লাগে না। হিসাব ফোনের app storage-এ থাকে। PIN অ্যাপ খোলা নিয়ন্ত্রণ করে; database নিজে encrypt করা নয়। অ্যাপ uninstall করলে local data মুছে যাবে।'),
-    TextButton(onPressed:() => showLicensePage(context:context,applicationName:'Amar Taka',applicationVersion:'0.2.0',applicationLegalese:'by MEskander'),child:const Text('ওপেন সোর্স লাইসেন্স')),
+    TextButton(onPressed:() => showLicensePage(context:context,applicationName:'Amar Taka',applicationVersion:'0.3.0',applicationLegalese:'by MEskander'),child:const Text('ওপেন সোর্স লাইসেন্স')),
   ]));
 }
 class PinEditor extends StatefulWidget {

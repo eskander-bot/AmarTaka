@@ -40,7 +40,9 @@ s = s.replace('buildTypes {', '''signingConfigs {
             }
         }
     }
-    buildTypes {''')
+    buildTypes {
+        getByName("debug") { applicationIdSuffix = ".preview" }
+''')
 s = s.replace('signingConfig = signingConfigs.getByName("debug")', 'signingConfig = if (keyPropertiesFile.exists()) signingConfigs.getByName("upload") else null')
 s += '\ndependencies { coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") }\n'
 gradle.write_text(s)
@@ -91,3 +93,8 @@ class MainActivity: FlutterActivity() {
 }
 ''')
 print('Project ready:', app)
+
+# A separate test package keeps the user's existing installation/data untouched.
+debug_manifest = app / 'android/app/src/debug/AndroidManifest.xml'
+debug_manifest.parent.mkdir(parents=True,exist_ok=True)
+debug_manifest.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools"><application android:label="Amar Taka Preview" tools:replace="android:label"/></manifest>')
