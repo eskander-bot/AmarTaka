@@ -97,4 +97,4 @@ print('Project ready:', app)
 # A separate test package keeps the user's existing installation/data untouched.
 debug_manifest = app / 'android/app/src/debug/AndroidManifest.xml'
 debug_manifest.parent.mkdir(parents=True,exist_ok=True)
-debug_manifest.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:label="Amar Taka Preview"/></manifest>')
+debug_manifest.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools"><application android:label="Amar Taka Preview" tools:replace="android:label"/></manifest>')
