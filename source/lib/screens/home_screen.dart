@@ -4,6 +4,7 @@ import '../models/transaction.dart';
 import '../utils/formatters.dart';
 import '../theme/app_theme.dart';
 import '../widgets/finance_cards.dart';
+import '../widgets/wealth_cards.dart';
 import '../finance/portfolio.dart';
 import '../finance/finance_screen.dart';
 import '../finance/category_budgets.dart';
@@ -91,7 +92,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final balance = _sum(_all,TxnType.income)-_sum(_all,TxnType.expense);
     return [
       if(_profileName.isNotEmpty)Padding(padding:const EdgeInsets.only(top:10),child:Text('স্বাগতম, $_profileName')),
-      const SizedBox(height:12),BalanceCard(balance:balance),const SizedBox(height:18),
+      Padding(padding:const EdgeInsets.only(top:8,bottom:14),child:Text(DateTime.now().hour<12?'শুভ সকাল':DateTime.now().hour<17?'শুভ অপরাহ্ণ':'শুভ সন্ধ্যা',style:Theme.of(context).textTheme.bodySmall)),
+      BalanceCard(balance:_portfolio.netWorth,label:'নিট সম্পদ',caption:'আপনার সম্পদ থেকে দায় বাদ দিয়ে'),
+      const SizedBox(height:8),HealthCard(income:income,expense:expense,portfolio:_portfolio),
+      AllocationCard(portfolio:_portfolio,onOpen:_finance),
+      Card(child:ListTile(leading:const Icon(Icons.savings_outlined),title:const Text('সঞ্চয়'),subtitle:const Text('DPS, FDR ও সঞ্চয়পত্র'),trailing:const Icon(Icons.chevron_right),onTap:() async {await Navigator.push(context,MaterialPageRoute(builder:(_)=>const FinanceScreen(savingsOnly:true)));if(mounted)await _load();})),
+      Padding(padding:const EdgeInsets.symmetric(vertical:12),child:Text('আয়–ব্যয়ের ব্যালেন্স ${formatMinor(balance)}',style:Theme.of(context).textTheme.titleMedium)),
       QuickActions(onIncome:() => _editTransaction(null,TxnType.income),onExpense:() => _editTransaction(null,TxnType.expense)),
       _monthPicker(),LayoutBuilder(builder:(context,box) {
         final cards = [SummaryCard(label:'মাসের আয়',amount:income,income:true),SummaryCard(label:'মাসের ব্যয়',amount:expense,income:false)];
