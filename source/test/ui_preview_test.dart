@@ -45,8 +45,6 @@ void main() {
       )));
       await tester.pumpAndSettle();
       expect(tester.takeException(),isNull);
-      expect(find.text('ব্যয় যোগ'),findsOneWidget);
-      expect(find.text('আয় যোগ'),findsOneWidget);
       await tester.runAsync(() async {
         final image = await (boundary.currentContext!.findRenderObject() as RenderRepaintBoundary).toImage(pixelRatio:2);
         final bytes = await image.toByteData(format:ui.ImageByteFormat.png);
@@ -57,6 +55,9 @@ void main() {
       await tester.tap(find.byTooltip('ব্যালেন্স আড়াল করুন'));
       await tester.pumpAndSettle();
       expect(find.text('৳ ••••••'),findsOneWidget);
+      await tester.scrollUntilVisible(find.text('ব্যয় যোগ'),200,scrollable:find.byType(Scrollable).first);
+      expect(find.text('ব্যয় যোগ'),findsOneWidget);
+      expect(find.text('আয় যোগ'),findsOneWidget);
       await tester.drag(find.byType(ListView).first,const Offset(0,-450));
       await tester.pumpAndSettle();
       expect(tester.takeException(),isNull);
