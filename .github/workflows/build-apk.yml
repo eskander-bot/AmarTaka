@@ -31,6 +31,8 @@ jobs:
           cache: true
       - name: Generate Android project
         run: python3 scripts/bootstrap.py
+      - name: Bundle verified offline Bengali fonts
+        run: python3 scripts/assets.py
       - name: Resolve dependencies
         working-directory: .build/amartaka
         run: flutter pub get
@@ -40,6 +42,18 @@ jobs:
       - name: Test money, migrations, backup and UI
         working-directory: .build/amartaka
         run: flutter test
+      - name: Upload actual Flutter UI previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Amar-Taka-UI-previews
+          path: .build/amartaka/build/ui-previews/
+          if-no-files-found: ignore
+      - name: Preserve test signing identity for later preview updates
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: amar-taka-preview-debug-signing-v1
       - name: Build installable test APK
         working-directory: .build/amartaka
         run: flutter build apk --debug --build-number=${{ github.run_number }}

@@ -27,6 +27,7 @@ Install Flutter **3.35.7**, Android Studio/SDK and Java 17. Android SDK 36 is re
 ```sh
 flutter doctor
 python scripts/bootstrap.py
+python scripts/assets.py
 cd .build/amartaka
 flutter pub get
 flutter analyze --no-fatal-infos
@@ -63,3 +64,9 @@ The earlier workflow rebuilt a release with a disposable debug signing key. Andr
 The public TakaTrack store feature list was used as a functional reference only. No TakaTrack source, binary, logo, screenshot, text assets or other resources are included. The work extends MEskander's existing repository and uses licensed Flutter/open-source dependencies; it is not a claim that all dependencies were authored here. In-app open-source licenses remain available.
 
 Functional parity with unobserved TakaTrack behavior is not established. CSV is a report, not a restorable full backup. Reminders currently offer daily or the first day of each month, in Bangladesh time only.
+
+## UI update 0.3.0
+
+New navy/blue themes, compact dashboard, responsive summary cards, dedicated income/expense actions and balance visibility control. Hind Siliguri fonts and their SIL OFL license are integrity-checked and bundled at build time. No runtime font connection is needed. Source: https://github.com/google/fonts/tree/main/ofl/hindsiliguri .
+
+Debug UI builds now install as `Amar Taka Preview` (`com.meskander.amartaka.preview`) alongside the original app. Production identity stays `com.meskander.amartaka`. Export a JSON backup from the previous app and restore it in Preview if you want to test with existing records. Do not uninstall the original to test a new UI. Preview debug signing is cached across subsequent builds.

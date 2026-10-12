@@ -35,7 +35,8 @@ buildTypes { release { signingConfig = signingConfigs.getByName("debug") } }
             self.assertIn('targetSdk = 36', gradle)
             self.assertIn('compileSdk = 36', gradle)
             self.assertIn('else null', gradle)
-            self.assertNotIn('getByName("debug")', gradle)
+            self.assertNotIn('signingConfigs.getByName("debug")', gradle)
+            self.assertIn('applicationIdSuffix = ".preview"', gradle)
             self.assertIn('JavaVersion.VERSION_17', gradle)
             for path in (app / 'android/app/src/main/res').rglob('*.xml'):
                 ET.parse(path)

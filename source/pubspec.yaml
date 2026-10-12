@@ -1,7 +1,7 @@
 name: amartaka
 description: Bangla offline personal ledger by MEskander.
 publish_to: none
-version: 0.2.0+2
+version: 0.3.0+3
 environment:
   sdk: '>=3.9.0 <4.0.0'
 dependencies:
@@ -22,3 +22,12 @@ dev_dependencies:
   sqflite_common_ffi: 2.3.6
 flutter:
   uses-material-design: true
+  assets:
+    - assets/fonts/OFL.txt
+  fonts:
+    - family: HindSiliguri
+      fonts:
+        - asset: assets/fonts/HindSiliguri-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/HindSiliguri-SemiBold.ttf
+          weight: 600

@@ -4,7 +4,8 @@ import '../models/transaction.dart';
 import '../utils/formatters.dart';
 class AddTransactionScreen extends StatefulWidget {
   final Txn? transaction;
-  const AddTransactionScreen({super.key,this.transaction});
+  final TxnType initialType;
+  const AddTransactionScreen({super.key,this.transaction,this.initialType = TxnType.expense});
   @override State<AddTransactionScreen> createState() => _AddTransactionScreenState();
 }
 class _AddTransactionScreenState extends State<AddTransactionScreen> {
@@ -16,7 +17,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   bool _loading = true,_saving = false;
   @override void initState() {
     super.initState(); final t = widget.transaction;
-    _type = t?.type ?? TxnType.expense; _date = t?.date ?? DateTime.now(); _category = t?.category;
+    _type = t?.type ?? widget.initialType; _date = t?.date ?? DateTime.now(); _category = t?.category;
     _amount.text = t == null ? '' : moneyInput(t.amountMinor); _note.text = t?.note ?? ''; _loadCategories();
   }
   Future<void> _loadCategories() async {
