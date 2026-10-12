@@ -18,7 +18,7 @@ class _LockScreenState extends State<LockScreen> {
     if(_busy)return;setState(()=>_busy=true);
     try{if(await Biometrics.enabled() && await Biometrics.authenticate()){if(mounted)widget.onUnlocked();}else{if(mounted)setState(()=>_error='Biometric হয়নি। PIN ব্যবহার করুন।');}}
     finally{if(mounted)setState(()=>_busy=false);}
-
+  }
   @override void dispose() { _pin.dispose(); super.dispose(); }
   Future<void> _unlock() async {
     if (_busy) return;
