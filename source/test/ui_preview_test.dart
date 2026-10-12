@@ -16,6 +16,9 @@ void main() {
       ..addFont(rootBundle.load('assets/fonts/HindSiliguri-Regular.ttf'))
       ..addFont(rootBundle.load('assets/fonts/HindSiliguri-SemiBold.ttf'));
     await loader.load();
+    final icons = FontLoader('MaterialIcons')
+      ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+    await icons.load();
   });
   Future<LedgerOverview> fixture(DateTime month) async => LedgerOverview(
     budget:1800000,
@@ -34,6 +37,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize); addTearDown(tester.view.resetDevicePixelRatio);
       final boundary = GlobalKey();
       await tester.pumpWidget(RepaintBoundary(key:boundary,child:MaterialApp(
+        debugShowCheckedModeBanner:false,
         theme:variant == 'dark' ? AppTheme.dark : AppTheme.light,
         locale:const Locale('bn'),supportedLocales:const [Locale('bn'),Locale('en')],localizationsDelegates:GlobalMaterialLocalizations.delegates,
         builder:(context,child) => MediaQuery(data:MediaQuery.of(context).copyWith(textScaler:TextScaler.linear(small ? 1.6 : 1)),child:child!),
