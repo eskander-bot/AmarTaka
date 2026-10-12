@@ -8,7 +8,7 @@ class DbHelper {
   static final instance = DbHelper._();
   Future<Database>? _opening;
   Future<Database> get db => _opening ??= _open().catchError((Object e) { _opening = null; throw e; });
-  Future<Database> _open() async => openDatabase(join(await getDatabasesPath(), 'amar_taka.db'), version:2, onCreate:create, onUpgrade:upgrade);
+  Future<Database> _open() async => openDatabase(join(await getDatabasesPath(), 'amar_taka.db'), version:3, onCreate:create, onUpgrade:upgrade);
   static Future<void> create(Database d, int version) async {
     await d.execute('CREATE TABLE transactions(id INTEGER PRIMARY KEY AUTOINCREMENT, amount_minor INTEGER NOT NULL CHECK(amount_minor > 0), category TEXT NOT NULL, note TEXT NOT NULL DEFAULT "", date TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ("income","expense")))');
     await d.execute('CREATE TABLE categories(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, type TEXT NOT NULL, UNIQUE(name,type))');
@@ -17,6 +17,7 @@ class DbHelper {
       for (final c in cats) { await d.insert('categories', {'name':c,'type':type.name}); }
     }
     await _extras(d);
+    if(version>=3) await _finance(d);
   }
   static Future<void> upgrade(Database d, int old, int version) async {
     if (old < 2) {
@@ -27,6 +28,13 @@ class DbHelper {
       await d.execute('DROP TABLE transactions_v1');
       await _extras(d);
     }
+    if (old < 3 && version >= 3) await _finance(d);
+  }
+  static Future<void> _finance(Database d) async {
+    await d.execute('CREATE TABLE holdings(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,title TEXT NOT NULL,institution TEXT NOT NULL,reference TEXT NOT NULL,subtype TEXT NOT NULL,note TEXT NOT NULL,amount_minor INTEGER NOT NULL CHECK(amount_minor>=0),value_minor INTEGER NOT NULL CHECK(value_minor>=0),rate_bps INTEGER NOT NULL CHECK(rate_bps>=0),months_paid INTEGER NOT NULL CHECK(months_paid>=0),active INTEGER NOT NULL,start TEXT NOT NULL,end TEXT NOT NULL)');
+    await d.execute('CREATE TABLE account_movements(id INTEGER PRIMARY KEY AUTOINCREMENT,account_id INTEGER NOT NULL,target_id INTEGER,type TEXT NOT NULL,amount_minor INTEGER NOT NULL CHECK(amount_minor>0),date TEXT NOT NULL,note TEXT NOT NULL)');
+    await d.execute('CREATE INDEX movements_account ON account_movements(account_id)');
+    await d.execute('CREATE TABLE category_budgets(id INTEGER PRIMARY KEY AUTOINCREMENT,month TEXT NOT NULL,category TEXT NOT NULL,amount_minor INTEGER NOT NULL CHECK(amount_minor>0),UNIQUE(month,category))');
   }
   static Future<void> _extras(Database d) async {
     await d.execute('CREATE INDEX transactions_date ON transactions(date)');

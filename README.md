@@ -70,3 +70,7 @@ Functional parity with unobserved TakaTrack behavior is not established. CSV is 
 New navy/blue themes, compact dashboard, responsive summary cards, dedicated income/expense actions and balance visibility control. Hind Siliguri fonts and their SIL OFL license are integrity-checked and bundled at build time. No runtime font connection is needed. Source: https://github.com/google/fonts/tree/main/ofl/hindsiliguri .
 
 Debug UI builds now install as `Amar Taka Preview` (`com.meskander.amartaka.preview`) alongside the original app. Production identity stays `com.meskander.amartaka`. Export a JSON backup from the previous app and restore it in Preview if you want to test with existing records. Do not uninstall the original to test a new UI. Preview debug signing is cached across subsequent builds.
+
+## Offline finance modules (0.4)
+
+Cash/bank accounts, transfers, DPS, FDR, savings certificates, investment P&L/ROI, lend/borrow repayments, category budgets, charts, biometric unlock with PIN fallback, and name/reset controls are now available. See [feature details and accounting conventions](docs/FEATURES-0.4.md). JSON backups include the new modules and still read old version-2 files.

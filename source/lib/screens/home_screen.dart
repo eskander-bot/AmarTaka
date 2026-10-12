@@ -4,6 +4,10 @@ import '../models/transaction.dart';
 import '../utils/formatters.dart';
 import '../theme/app_theme.dart';
 import '../widgets/finance_cards.dart';
+import '../finance/portfolio.dart';
+import '../finance/finance_screen.dart';
+import '../finance/category_budgets.dart';
+import '../finance/finance_charts.dart';
 import 'add_transaction_screen.dart';
 import 'item_editor.dart';
 import 'settings_screen.dart';
@@ -11,8 +15,10 @@ import 'settings_screen.dart';
 class LedgerOverview {
   final List<Txn> transactions;
   final List<Map<String,Object?>> goals;
+  final Portfolio portfolio;
+  final String profileName;
   final int? budget;
-  const LedgerOverview({required this.transactions,this.goals = const [],this.budget});
+  const LedgerOverview({required this.transactions,this.goals = const [],this.budget,this.portfolio=const Portfolio(),this.profileName=''});
 }
 class HomeScreen extends StatefulWidget {
   final Future<LedgerOverview> Function(DateTime month)? loadData;
@@ -22,6 +28,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0; DateTime _month = DateTime(DateTime.now().year,DateTime.now().month);
   List<Txn> _all = []; List<Map<String,Object?>> _goals = [];
+  Portfolio _portfolio=const Portfolio(); String _profileName='';
   int? _budget; String _search = ''; TxnType? _kind;
   bool _loading = true,_busy = false; String? _error;
   int _request = 0;
@@ -29,10 +36,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _load() async {
     final request = ++_request;
     try {
-      final data = widget.loadData == null ? LedgerOverview(transactions:await DbHelper.instance.getTransactions(),goals:await DbHelper.instance.items('goals'),budget:await DbHelper.instance.budget(_month)) : await widget.loadData!(_month);
+      final data = widget.loadData == null ? LedgerOverview(transactions:await DbHelper.instance.getTransactions(),goals:await DbHelper.instance.items('goals'),budget:await DbHelper.instance.budget(_month),portfolio:await (await PortfolioStore.open()).read(),profileName:await DbHelper.instance.setting('profile_name')??'') : await widget.loadData!(_month);
       final all = data.transactions; final goals = data.goals; final budget = data.budget;
       if (!mounted || request != _request) return;
-      setState(() { _all = all; _goals = goals; _budget = budget; _loading = false; _error = null; });
+      setState(() { _all = all; _portfolio=data.portfolio; _profileName=data.profileName; _goals = goals; _budget = budget; _loading = false; _error = null; });
     } catch (_) { if (mounted && request == _request) setState(() { _loading = false; _error = 'হিসাব পড়া যায়নি। আবার চেষ্টা করুন।'; }); }
   }
   List<Txn> get _monthly => _all.where((t) => t.date.year == _month.year && t.date.month == _month.month).toList();
@@ -76,10 +83,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }))));
   }
   Widget _budgetCard() => BudgetCard(spent:_sum(_monthly,TxnType.expense),budget:_budget,onEdit:_setBudget);
+  Future<void> _finance() async { await Navigator.push(context,MaterialPageRoute(builder:(_)=>const FinanceScreen())); if(mounted)await _load(); }
+  Future<void> _categoryBudgets() async { await Navigator.push(context,MaterialPageRoute(builder:(_)=>CategoryBudgetsScreen(month:_month))); if(mounted)await _load(); }
+  Widget _financeLink()=>Card(child:ListTile(leading:const Icon(Icons.account_balance_wallet_outlined),title:const Text('সম্পদ ও দায়'),subtitle:Text('নিট সম্পদ ${formatMinor(_portfolio.netWorth)}'),trailing:const Icon(Icons.chevron_right),onTap:_finance));
   List<Widget> _dashboard() {
     final income = _sum(_monthly,TxnType.income),expense = _sum(_monthly,TxnType.expense);
     final balance = _sum(_all,TxnType.income)-_sum(_all,TxnType.expense);
     return [
+      if(_profileName.isNotEmpty)Padding(padding:const EdgeInsets.only(top:10),child:Text('স্বাগতম, $_profileName')),
       const SizedBox(height:12),BalanceCard(balance:balance),const SizedBox(height:18),
       QuickActions(onIncome:() => _editTransaction(null,TxnType.income),onExpense:() => _editTransaction(null,TxnType.expense)),
       _monthPicker(),LayoutBuilder(builder:(context,box) {
@@ -87,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (MediaQuery.textScalerOf(context).scale(14) > 22) return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:cards);
         return Row(crossAxisAlignment:CrossAxisAlignment.start,children:[Expanded(child:cards[0]),const SizedBox(width:12),Expanded(child:cards[1])]);
       }),const SizedBox(height:10),_budgetCard(),
+      _financeLink(),
       _heading('সাম্প্রতিক লেনদেন',action:TextButton(onPressed:() => setState(() => _tab = 1),child:const Text('সব দেখুন'))),
       if (_monthly.isEmpty) _empty('এখনও কোনো লেনদেন নেই।\nউপরে আয় বা ব্যয় যোগ করুন।',Icons.receipt_long_outlined),..._monthly.take(8).map(_transaction),
     ];
@@ -95,9 +107,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Widget> _history() {
     final query = _search.toLowerCase();
     final rows = _monthly.where((t) => (_kind == null || t.type == _kind) && '${categoryLabel(t.category)} ${t.category} ${t.note} ${moneyInput(t.amountMinor)}'.toLowerCase().contains(toEnglish(query))).toList();
-    return [_monthPicker(),TextField(decoration:const InputDecoration(prefixIcon:Icon(Icons.search),hintText:'ক্যাটাগরি, বিবরণ বা টাকা খুঁজুন'),onChanged:(v) => setState(() => _search = v)),const SizedBox(height:12),Wrap(spacing:8,children:[ChoiceChip(label:const Text('সব'),selected:_kind == null,onSelected:(_) => setState(() => _kind = null)),...TxnType.values.map((t) => ChoiceChip(label:Text(t == TxnType.income ? 'আয়' : 'ব্যয়'),selected:_kind == t,onSelected:(_) => setState(() => _kind = t)))]),const SizedBox(height:10),Text('${toBangla('${rows.length}')}টি লেনদেন'),if (rows.isEmpty) _empty('কোনো লেনদেন পাওয়া যায়নি।',Icons.search_off),...rows.map(_transaction)];
+    return [_monthPicker(),TextField(decoration:const InputDecoration(prefixIcon:Icon(Icons.search),hintText:'ক্যাটাগরি, বিবরণ বা টাকা খুঁজুন'),onChanged:(v) => setState(() => _search = v)),const SizedBox(height:12),Wrap(spacing:8,children:[ChoiceChip(label:const Text('সব'),selected:_kind == null,onSelected:(_) => setState(() => _kind = null)),...TxnType.values.map((t) => ChoiceChip(label:Text(t == TxnType.income ? 'আয়' : 'ব্যয়'),selected:_kind == t,onSelected:(_) => setState(() => _kind = t)))]),const SizedBox(height:10),Text('${toBangla('${rows.length}')}টি লেনদেন'),if (rows.isEmpty) _empty('কোনো লেনদেন পাওয়া যায়নি।',Icons.search_off),...List.generate(rows.length,(i)=>Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[if(i==0 || formatDate(rows[i-1].date)!=formatDate(rows[i].date))Padding(padding:const EdgeInsets.only(top:14,bottom:5),child:Text(formatDate(rows[i].date),style:Theme.of(context).textTheme.titleSmall)),_transaction(rows[i])]))];
   }
-  List<Widget> _plans() => [_monthPicker(),_budgetCard(),_heading('ইচ্ছা ও সঞ্চয়',action:IconButton(tooltip:'নতুন লক্ষ্য',onPressed:() => _editGoal(),icon:const Icon(Icons.add))),if (_goals.isEmpty) _empty('আপনার প্রথম সঞ্চয়ের লক্ষ্য যোগ করুন।',Icons.savings_outlined),..._goals.map((g) {
+  List<Widget> _plans() => [_financeLink(),Card(child:ListTile(leading:const Icon(Icons.pie_chart_outline),title:const Text('ক্যাটাগরি অনুযায়ী বাজেট'),trailing:const Icon(Icons.chevron_right),onTap:_categoryBudgets)),_monthPicker(),_budgetCard(),_heading('ইচ্ছা ও সঞ্চয়',action:IconButton(tooltip:'নতুন লক্ষ্য',onPressed:() => _editGoal(),icon:const Icon(Icons.add))),if (_goals.isEmpty) _empty('আপনার প্রথম সঞ্চয়ের লক্ষ্য যোগ করুন।',Icons.savings_outlined),..._goals.map((g) {
     final target = g['target_minor'] as int,saved = g['saved_minor'] as int;
     return Card(child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[Expanded(child:Text(g['title'] as String,style:Theme.of(context).textTheme.titleMedium)),IconButton(tooltip:'লক্ষ্য সম্পাদনা',onPressed:() => _editGoal(g),icon:const Icon(Icons.edit_outlined)),IconButton(tooltip:'লক্ষ্য মুছুন',onPressed:() async { if (!await _confirm('এই সঞ্চয়ের লক্ষ্য মুছে যাবে।')) return; try { await DbHelper.instance.deleteItem('goals',g['id'] as int); await _load(); } catch (_) { _message('মুছে ফেলা যায়নি।'); } },icon:const Icon(Icons.delete_outline))]),Text('${formatMinor(saved)} / ${formatMinor(target)}'),const SizedBox(height:12),LinearProgressIndicator(value:(saved/target).clamp(0.0,1.0),minHeight:7,borderRadius:BorderRadius.circular(5)),const SizedBox(height:10),Text(saved >= target ? 'লক্ষ্য পূরণ হয়েছে!' : 'আরও ${formatMinor(target-saved)} প্রয়োজন'),if ((g['note'] as String).isNotEmpty) Text(g['note'] as String)])));
   })];
@@ -106,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen> {
     for (final t in rows.where((t) => t.type == TxnType.expense)) { categories.update(t.category,(v) => v+t.amountMinor,ifAbsent:() => t.amountMinor); }
     final entries = categories.entries.toList()..sort((a,b) => b.value.compareTo(a.value));
     final expense = _sum(rows,TxnType.expense),income = _sum(rows,TxnType.income);
-    return [_monthPicker(),_total('মাসের নিট আয়–ব্যয়',income-expense,AppColors.primary),_heading('কোথায় কত ব্যয়'),if (entries.isEmpty) _empty('ব্যয় যোগ করলে এখানে রিপোর্ট দেখাবে।',Icons.bar_chart),...entries.map((e) => Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('${categoryLabel(e.key)} • ${formatMinor(e.value)}'),const SizedBox(height:10),LinearProgressIndicator(value:e.value/expense,minHeight:9,borderRadius:BorderRadius.circular(6)),const SizedBox(height:5),Text('${toBangla((100*e.value/expense).toStringAsFixed(1))}%')])))),
+    return [_monthPicker(),FinanceCharts(transactions:_all,month:_month),Card(child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('সঞ্চয়ের হার: ${toBangla(FinanceMath.savingsRate(income,expense).toStringAsFixed(1))}%'),Text('হিসাবের স্কোর: ${toBangla("${FinanceMath.health(income:income,expense:expense,liquid:_portfolio.total('cash')+_portfolio.total('bank'),debt:_portfolio.liabilities,assets:_portfolio.assets)}")}/১০০'),const Text('নিজস্ব সূচক: সঞ্চয়ের হার ৪০, ৬ মাসের নগদ সুরক্ষা ৩৫, সম্পদের তুলনায় দায় ২৫। এটি কোনো ব্যাংকের credit score নয়।',style:TextStyle(fontSize:11))]))),_total('মাসের নিট আয়–ব্যয়',income-expense,AppColors.primary),_heading('কোথায় কত ব্যয়'),if (entries.isEmpty) _empty('ব্যয় যোগ করলে এখানে রিপোর্ট দেখাবে।',Icons.bar_chart),...entries.map((e) => Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('${categoryLabel(e.key)} • ${formatMinor(e.value)}'),const SizedBox(height:10),LinearProgressIndicator(value:e.value/expense,minHeight:9,borderRadius:BorderRadius.circular(6)),const SizedBox(height:5),Text('${toBangla((100*e.value/expense).toStringAsFixed(1))}%')])))),
       _heading('গত ৬ মাস'),...List.generate(6,(i) { final d = DateTime(_month.year,_month.month-5+i); final list = _all.where((t) => t.date.year == d.year && t.date.month == d.month); return Card(child:ListTile(title:Text(monthLabel(d)),subtitle:Text('আয় ${formatMinor(_sum(list,TxnType.income))}\nব্যয় ${formatMinor(_sum(list,TxnType.expense))}'),isThreeLine:true)); }),
       _heading('গত ৭ দিনের ব্যয়'),...List.generate(7,(i) { final now = DateTime.now(); final d = DateTime(now.year,now.month,now.day-6+i); final list = _all.where((t) => t.date.year == d.year && t.date.month == d.month && t.date.day == d.day); return ListTile(title:Text(formatDate(d)),trailing:Text(formatMinor(_sum(list,TxnType.expense)))); }),
     ];

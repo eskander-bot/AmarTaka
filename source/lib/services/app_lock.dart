@@ -40,5 +40,6 @@ class AppLock {
   static Future<void> remove(String pin) async {
     if (!await verify(pin)) throw StateError('PIN সঠিক নয়।');
     await _store.delete(key:_key);
+    await _store.delete(key:'biometric_enabled');
   }
 }

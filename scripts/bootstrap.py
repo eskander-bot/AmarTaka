@@ -50,6 +50,7 @@ main = app / 'android/app/src/main'
 (main / 'AndroidManifest.xml').write_text('''<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" tools:node="remove"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application android:label="Amar Taka" android:name="${applicationName}" android:icon="@mipmap/ic_launcher"
         android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules">
@@ -80,8 +81,8 @@ activity = main / 'kotlin/com/meskander/amartaka/MainActivity.kt'
 activity.write_text('''package com.meskander.amartaka
 import android.os.Bundle
 import android.view.WindowManager
-import io.flutter.embedding.android.FlutterActivity
-class MainActivity: FlutterActivity() {
+import io.flutter.embedding.android.FlutterFragmentActivity
+class MainActivity: FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Prevent screenshots and app-switcher snapshots in production.
@@ -92,6 +93,10 @@ class MainActivity: FlutterActivity() {
     }
 }
 ''')
+# local_auth requires an AppCompat launch theme on Android 8 and earlier.
+for style in res.glob('values*/styles.xml'):
+    value = style.read_text().replace('@android:style/Theme.Light.NoTitleBar', 'Theme.AppCompat.DayNight.NoActionBar').replace('@android:style/Theme.Black.NoTitleBar', 'Theme.AppCompat.DayNight.NoActionBar')
+    style.write_text(value)
 print('Project ready:', app)
 
 # A separate test package keeps the user's existing installation/data untouched.

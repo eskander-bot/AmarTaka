@@ -6,12 +6,12 @@ String toEnglish(String input) {
   return input;
 }
 /// Parse decimal money without floating point rounding. Input is in taka.
-int? parseMoney(String text) {
+int? parseMoney(String text,{bool allowZero=false}) {
   final s = toEnglish(text.trim());
   if (!RegExp(r'^\d{1,9}(\.\d{1,2})?$').hasMatch(s)) return null;
   final parts = s.split('.');
   final n = int.parse(parts[0]) * 100 + (parts.length == 2 ? int.parse(parts[1].padRight(2, '0')) : 0);
-  return n > 0 && n <= maxMinor ? n : null;
+  return n >= (allowZero ? 0 : 1) && n <= maxMinor ? n : null;
 }
 String moneyInput(int minor) => '${minor ~/ 100}.${(minor % 100).toString().padLeft(2, '0')}';
 String formatMinor(int minor) {

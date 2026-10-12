@@ -63,7 +63,7 @@ buildTypes { release { signingConfig = signingConfigs.getByName("debug") } }
         import re
         import sqlite3
         source = (ROOT / 'source/lib/database/db_helper.dart').read_text()
-        migration = source.split('static Future<void> upgrade')[1].split('static Future<void> _extras')[0]
+        migration = source.split('static Future<void> upgrade')[1].split('static Future<void> _finance')[0]
         statements = re.findall(r"await d.execute\('([^']*)'\);", migration)
         self.assertEqual(len(statements),4)
         db = sqlite3.connect(':memory:')

@@ -6,6 +6,8 @@ import '../main.dart';
 import '../database/db_helper.dart';
 import '../services/backup.dart';
 import '../services/app_lock.dart';
+import '../services/biometrics.dart';
+import '../finance/finance_screen.dart';
 import '../services/reminders.dart';
 import '../utils/formatters.dart';
 import 'item_editor.dart';
@@ -18,7 +20,27 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _busy = false;
   String _reminder = 'বন্ধ';
-  @override void initState() { super.initState(); _loadReminder(); }
+  bool _biometric=false;
+  @override void initState() { super.initState(); _loadReminder(); _loadBiometric(); }
+  Future<void> _loadBiometric() async {try{final v=await Biometrics.enabled();if(mounted)setState(()=>_biometric=v);}catch(_){}}
+  Future<void> _biometricToggle() async {
+    if(!preferences.pinEnabled){_message('আগে PIN চালু করুন; biometric না হলে PIN ব্যবহার করবেন।');return;}
+    await Biometrics.setEnabled(!_biometric);await _loadBiometric();
+  }
+  Future<void> _profile() async {
+    final current=await DbHelper.instance.setting('profile_name')??'';
+    if(!mounted)return;final c=TextEditingController(text:current);
+    final name=await showDialog<String>(context:context,builder:(ctx)=>AlertDialog(title:const Text('আপনার নাম'),content:TextField(controller:c,maxLength:60,decoration:const InputDecoration(labelText:'নাম (ঐচ্ছিক)')),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('বাদ দিন')),FilledButton(onPressed:()=>Navigator.pop(ctx,c.text.trim()),child:const Text('সংরক্ষণ'))]));
+    if(name!=null){await DbHelper.instance.setSetting('profile_name',name);await widget.onDataChanged();}
+  }
+  Future<void> _clearData() async {
+    final c=TextEditingController();
+    final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('সব হিসাব মুছবেন?'),content:Column(mainAxisSize:MainAxisSize.min,children:[const Text('আগে JSON backup রাখুন। সব লেনদেন, সম্পদ, ধার, বাজেট, লক্ষ্য ও নোট মুছে যাবে। নিশ্চিত করতে DELETE লিখুন।'),TextField(controller:c,decoration:const InputDecoration(labelText:'DELETE'))]),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('বাদ দিন')),FilledButton(onPressed:(){if(c.text=='DELETE')Navigator.pop(ctx,true);},child:const Text('সব হিসাব মুছুন'))]));
+    if(ok!=true)return;
+    if(preferences.pinEnabled){if(!mounted)return;final pin=await Navigator.push<String>(context,MaterialPageRoute(builder:(_)=>const PinEditor(removing:true)));if(pin==null || !await AppLock.verify(pin))return;}
+    await (await DbHelper.instance.db).transaction((txn) async {for(final table in Backup.tables.where((t)=>t!='categories')){await txn.delete(table);}});
+    await widget.onDataChanged();_message('সব হিসাব মুছে দেওয়া হয়েছে। PIN ও পছন্দের সেটিং রাখা হয়েছে।');
+  }
   Future<void> _loadReminder() async {
     try { final s = await DbHelper.instance.setting('reminder'); if (mounted) setState(() => _reminder = s ?? 'বন্ধ'); } catch (_) { /* Existing setting can be retried. */ }
   }
@@ -41,7 +63,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (bytes == null || bytes.length > 10 * 1024 * 1024) throw const FormatException('Invalid size');
     final text = utf8.decode(bytes); final data = Backup.validate(text);
     if (!mounted) return;
-    final ok = await showDialog<bool>(context:context,builder:(ctx) => AlertDialog(title:const Text('বর্তমান হিসাব প্রতিস্থাপন করবেন?'),content:Text('এই ফাইলে ${toBangla('${data['transactions']!.length}')}টি লেনদেন আছে।\n\nবর্তমান লেনদেন, বাজেট, লক্ষ্য ও নোটের জায়গায় ফাইলের হিসাব আসবে। আগে নিজের বর্তমান JSON backup রাখুন। PIN বদলাবে না।'),actions:[TextButton(onPressed:() => Navigator.pop(ctx,false),child:const Text('বাদ দিন')),FilledButton(onPressed:() => Navigator.pop(ctx,true),child:const Text('প্রতিস্থাপন করুন'))]));
+    final ok = await showDialog<bool>(context:context,builder:(ctx) => AlertDialog(title:const Text('বর্তমান হিসাব প্রতিস্থাপন করবেন?'),content:Text('এই ফাইলে ${toBangla('${data['transactions']!.length}')}টি লেনদেন আছে।\n\nবর্তমান লেনদেন, সম্পদ, অ্যাকাউন্ট, ধার, বাজেট, লক্ষ্য ও নোটের জায়গায় ফাইলের হিসাব আসবে। পুরোনো backup-এ নতুন হিসাবগুলো না থাকলে সেগুলো খালি হবে। আগে নিজের বর্তমান JSON backup রাখুন। PIN বদলাবে না।'),actions:[TextButton(onPressed:() => Navigator.pop(ctx,false),child:const Text('বাদ দিন')),FilledButton(onPressed:() => Navigator.pop(ctx,true),child:const Text('প্রতিস্থাপন করুন'))]));
     if (ok != true) return;
     await Backup.restore(text); await widget.onDataChanged(); _message('হিসাব ফিরিয়ে আনা হয়েছে।');
   }
@@ -50,7 +72,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final input = await Navigator.push<String>(context,MaterialPageRoute(builder:(_) => PinEditor(removing:enabled)));
     if (input == null) return;
     if (enabled) { await AppLock.remove(input); } else { await AppLock.set(input); }
-    await preferences.refreshPin(); if (mounted) setState(() {});
+    await preferences.refreshPin(); await _loadBiometric(); if (mounted) setState(() {});
     _message(enabled ? 'PIN বন্ধ হয়েছে।' : 'PIN চালু হয়েছে।');
   }
   Future<void> _remind() async {
@@ -68,6 +90,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
   @override Widget build(BuildContext context) => AbsorbPointer(absorbing:_busy,child:ListView(padding:const EdgeInsets.all(18),children:[
     if (_busy) const LinearProgressIndicator(),
+    Card(child:ListTile(leading:const Icon(Icons.account_balance_wallet_outlined),title:const Text('সম্পদ ও দায়'),subtitle:const Text('ব্যাংক, ক্যাশ, DPS, FDR, বিনিয়োগ, ধার–দেনা'),trailing:const Icon(Icons.chevron_right),onTap:()async{await Navigator.push(context,MaterialPageRoute(builder:(_)=>const FinanceScreen()));await widget.onDataChanged();})),
+    Card(child:ListTile(leading:const Icon(Icons.person_outline),title:const Text('আপনার নাম'),onTap:()=>_run(_profile))),
+    SwitchListTile(title:const Text('Fingerprint / Face lock'),subtitle:const Text('PIN চালু থাকতে হবে; ফোনের biometric ব্যবহার হবে।'),value:_biometric,onChanged:(_)=>_run(_biometricToggle)),
     Card(child:ListTile(leading:const Icon(Icons.menu_book_outlined),title:const Text('নোটবুক'),subtitle:const Text('মনে রাখার কথা ও দরকারি হিসাব'),trailing:const Icon(Icons.chevron_right),onTap:() => Navigator.push(context,MaterialPageRoute(builder:(_) => const NotebookScreen())))),
     const SizedBox(height:18),const Text('আপনার পছন্দ',style:TextStyle(fontSize:20,fontWeight:FontWeight.w600)),const SizedBox(height:12),
     DropdownButtonFormField<String>(initialValue:preferences.theme,decoration:const InputDecoration(labelText:'থিম'),items:const [DropdownMenuItem(value:'system',child:Text('ফোনের সেটিং অনুসারে')),DropdownMenuItem(value:'light',child:Text('হালকা')),DropdownMenuItem(value:'dark',child:Text('ডার্ক')),DropdownMenuItem(value:'amoled',child:Text('AMOLED কালো'))],onChanged:(v) { if (v != null) _run(() => preferences.setTheme(v)); }),
@@ -76,9 +101,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     const SizedBox(height:20),const Text('আপনার ডেটা',style:TextStyle(fontSize:20,fontWeight:FontWeight.w600)),
     const Padding(padding:EdgeInsets.symmetric(vertical:12),child:Text('JSON-এ সম্পূর্ণ backup; CSV-তে শুধু লেনদেনের রিপোর্ট। Export করা ফাইলে PIN বা encryption থাকে না—নিজের নিরাপদ জায়গায় রাখুন।')),
     Card(child:Column(children:[ListTile(leading:const Icon(Icons.save_alt),title:const Text('JSON backup রাখুন'),onTap:() => _run(() => _export(false))),ListTile(leading:const Icon(Icons.table_view_outlined),title:const Text('CSV রিপোর্ট নিন'),onTap:() => _run(() => _export(true))),ListTile(leading:const Icon(Icons.restore),title:const Text('JSON backup ফিরিয়ে আনুন'),onTap:() => _run(_restore))])),
-    const SizedBox(height:24),const Text('Amar Taka',style:TextStyle(fontSize:24,fontWeight:FontWeight.bold)),const Text('by MEskander • 0.3.0'),const SizedBox(height:12),
+    TextButton.icon(onPressed:()=>_run(_clearData),icon:const Icon(Icons.delete_forever_outlined),label:const Text('সব হিসাব মুছুন')),
+    const SizedBox(height:24),const Text('Amar Taka',style:TextStyle(fontSize:24,fontWeight:FontWeight.bold)),const Text('by MEskander • 0.4.0'),const SizedBox(height:12),
     const Text('কোনো লগইন, ব্যাংক সংযোগ বা server লাগে না। হিসাব ফোনের app storage-এ থাকে। PIN অ্যাপ খোলা নিয়ন্ত্রণ করে; database নিজে encrypt করা নয়। অ্যাপ uninstall করলে local data মুছে যাবে।'),
-    TextButton(onPressed:() => showLicensePage(context:context,applicationName:'Amar Taka',applicationVersion:'0.3.0',applicationLegalese:'by MEskander'),child:const Text('ওপেন সোর্স লাইসেন্স')),
+    TextButton(onPressed:() => showLicensePage(context:context,applicationName:'Amar Taka',applicationVersion:'0.4.0',applicationLegalese:'by MEskander'),child:const Text('ওপেন সোর্স লাইসেন্স')),
   ]));
 }
 class PinEditor extends StatefulWidget {

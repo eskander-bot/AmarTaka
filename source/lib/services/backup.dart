@@ -1,13 +1,15 @@
 import 'dart:convert';
 import '../database/db_helper.dart';
+import '../finance/portfolio.dart';
+import 'package:sqflite/sqflite.dart';
 import '../utils/formatters.dart';
 
 class Backup {
-  static const tables = ['transactions','categories','budgets','goals','notes'];
-  static Future<String> exportJson() async {
-    final d = await DbHelper.instance.db;
+  static const tables = ['transactions','categories','budgets','goals','notes','holdings','account_movements','category_budgets'];
+  static Future<String> exportJson({Database? database}) async {
+    final d = database ?? await DbHelper.instance.db;
     final data = await d.transaction((txn) async {
-      final result = <String,Object?>{'app':'amar-taka','schema':2,'exported_at':DateTime.now().toIso8601String()};
+      final result = <String,Object?>{'app':'amar-taka','schema':3,'exported_at':DateTime.now().toIso8601String()};
       for (final table in tables) { result[table] = await txn.query(table); }
       return result;
     });
@@ -17,10 +19,10 @@ class Backup {
   static Map<String,List<Map<String,Object?>>> validate(String text) {
     if (utf8.encode(text).length > 10 * 1024 * 1024) throw const FormatException('Backup too large');
     final root = jsonDecode(text);
-    if (root is! Map || root['app'] != 'amar-taka' || root['schema'] != 2) throw const FormatException('Unsupported backup');
+    if (root is! Map || root['app'] != 'amar-taka' || ![2,3].contains(root['schema'])) throw const FormatException('Unsupported backup');
     final result = <String,List<Map<String,Object?>>>{};
     for (final table in tables) {
-      final rows = root[table];
+      final rows = root['schema']==2 && ['holdings','account_movements','category_budgets'].contains(table) ? <Object?>[] : root[table];
       if (rows is! List || rows.length > 50000) throw const FormatException('Invalid rows');
       final ids = <int>{};
       final keys = <String>{};
@@ -56,6 +58,14 @@ class Backup {
           out['id'] = id;
         }
         switch (table) {
+          case 'holdings':
+            out.addAll(FinanceValidation.holding(m,withId:true));
+          case 'account_movements':
+            out.addAll(FinanceValidation.movement(m,withId:true));
+          case 'category_budgets':
+            final b=FinanceValidation.budget(m,withId:true);
+            if(!keys.add('${b['month']}:${b['category']}'))throw const FormatException('Duplicate category budget');
+            out.addAll(b);
           case 'transactions':
             out.addAll({'amount_minor':number('amount_minor'),'category':str('category',max:60),'note':str('note',max:2000,empty:true),'date':date('date'),'type':type()});
           case 'categories':
@@ -79,11 +89,18 @@ class Backup {
     }
     final categoryKeys = result['categories']!.map((c) => '${c['type']}:${c['name']}').toSet();
     if (result['transactions']!.any((t) => !categoryKeys.contains('${t['type']}:${t['category']}'))) throw const FormatException('Missing transaction category');
+    final accounts=result['holdings']!.where(isAccount).map((r)=>r['id']).toSet();
+    for(final m in result['account_movements']!) {
+      if(!accounts.contains(m['account_id']) || (m['type']=='transfer' && !accounts.contains(m['target_id'])))throw const FormatException('Missing movement account');
+    }
+    final portfolio=Portfolio(holdings:result['holdings']!,movements:result['account_movements']!);
+    if(portfolio.holdings.where(isAccount).any((a)=>portfolio.balance(a)<0 || portfolio.balance(a)>maxMinor))throw const FormatException('Invalid account balance');
+    if(result['category_budgets']!.any((b)=>!categoryKeys.contains('expense:${b['category']}')))throw const FormatException('Missing budget category');
     return result;
   }
-  static Future<void> restore(String text) async {
+  static Future<void> restore(String text,{Database? database}) async {
     final data = validate(text);
-    await (await DbHelper.instance.db).transaction((txn) async {
+    await (database ?? await DbHelper.instance.db).transaction((txn) async {
       for (final table in tables) {
         await txn.delete(table);
         for (final row in data[table]!) { await txn.insert(table,row); }
