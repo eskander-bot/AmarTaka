@@ -25,7 +25,7 @@ class Preferences extends ChangeNotifier {
 }
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  LicenseRegistry.addLicense(() async* { yield LicenseEntryWithLineBreaks(['Hind Siliguri'],await rootBundle.loadString('assets/fonts/OFL.txt')); });
+  LicenseRegistry.addLicense(() async* { yield LicenseEntryWithLineBreaks(['Noto Sans Bengali'],await rootBundle.loadString('assets/fonts/OFL.txt')); });
   runApp(const AmarTakaApp());
 }
 class AmarTakaApp extends StatefulWidget {
