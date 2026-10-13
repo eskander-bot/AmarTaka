@@ -49,35 +49,35 @@ jobs:
           name: Amar-Taka-UI-previews
           path: .build/amartaka/build/ui-previews/
           if-no-files-found: ignore
-      - name: Preserve test signing identity for later preview updates
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: amar-taka-preview-debug-signing-v1
-      - name: Build installable test APK
-        working-directory: .build/amartaka
-        run: flutter build apk --debug --build-number=${{ github.run_number }}
-      - name: Upload APK and dependency lock
-        uses: actions/upload-artifact@v4
-        with:
-          name: Amar-Taka-test-APK
-          path: |
-            .build/amartaka/build/app/outputs/flutter-apk/app-debug.apk
-            .build/amartaka/pubspec.lock
-      - name: Configure upload signing
-        if: github.event_name == 'workflow_dispatch' && inputs.play_bundle
+      - name: Configure permanent signing key
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: python3 scripts/signing.py
+      - name: Build installable test APK
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        working-directory: .build/amartaka
+        run: flutter build apk --debug --build-number=${{ github.run_number }}
+      - name: Verify APK uses permanent certificate
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: python3 scripts/signing.py --verify-apk .build/amartaka/build/app/outputs/flutter-apk/app-debug.apk
+      - name: Upload APK and dependency lock
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Amar-Taka-test-APK
+          path: |
+            .build/amartaka/build/app/outputs/flutter-apk/app-debug.apk
+            .build/amartaka/pubspec.lock
       - name: Build signed Play bundle
-        if: github.event_name == 'workflow_dispatch' && inputs.play_bundle
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.play_bundle
         working-directory: .build/amartaka
         run: flutter build appbundle --release --build-number=${{ github.run_number }}
       - name: Upload signed bundle
-        if: github.event_name == 'workflow_dispatch' && inputs.play_bundle
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.play_bundle
         uses: actions/upload-artifact@v4
         with:
           name: Amar-Taka-Play-AAB
