@@ -63,14 +63,14 @@ jobs:
         run: flutter build apk --release --build-number=${{ github.run_number }}
       - name: Verify APK uses permanent certificate
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        run: python3 scripts/signing.py --verify-apk .build/amartaka/build/app/outputs/flutter-apk/app-debug.apk
+        run: python3 scripts/signing.py --verify-apk .build/amartaka/build/app/outputs/flutter-apk/app-release.apk
       - name: Upload APK and dependency lock
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: Amar-Taka-test-APK
           path: |
-            .build/amartaka/build/app/outputs/flutter-apk/app-debug.apk
+            .build/amartaka/build/app/outputs/flutter-apk/app-release.apk
             .build/amartaka/pubspec.lock
       - name: Build signed Play bundle
         if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.play_bundle
