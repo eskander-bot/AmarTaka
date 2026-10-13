@@ -76,23 +76,29 @@ res = main / 'res'
 (res / 'xml/data_extraction_rules.xml').write_text('''<data-extraction-rules><cloud-backup><exclude domain="root" path="."/><exclude domain="database" path="."/><exclude domain="sharedpref" path="."/><exclude domain="file" path="."/></cloud-backup><device-transfer><exclude domain="root" path="."/><exclude domain="database" path="."/><exclude domain="sharedpref" path="."/><exclude domain="file" path="."/></device-transfer></data-extraction-rules>''')
 (res / 'drawable').mkdir(exist_ok=True)
 (res / 'drawable/ic_stat_taka.xml').write_text('''<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24"><path android:fillColor="#FFFFFFFF" android:pathData="M3,5h18v14H3z M15,9v6h6V9z" android:fillType="evenOdd"/></vector>''')
-(res / 'mipmap-anydpi').mkdir(exist_ok=True)
-(res / 'mipmap-anydpi/ic_launcher.xml').write_text('''<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108"><path android:fillColor="#244E40" android:pathData="M0,0h108v108H0z"/><path android:fillColor="#F7F4EC" android:pathData="M27,35h54v40H27z M34,42v26h40V42z" android:fillType="evenOdd"/><path android:fillColor="#C5D9A2" android:pathData="M62,50h19v13H62z"/><path android:fillColor="#244E40" android:pathData="M66,54h5v5h-5z"/></vector>''')
-# Use the original vector on all versions, rather than a generated Flutter icon.
-shutil.rmtree(res / 'mipmap-anydpi-v26', ignore_errors=True)
+# Launcher icon: the owner's wallet logo, pre-rendered PNGs kept in /icons.
+shutil.rmtree(res / 'mipmap-anydpi', ignore_errors=True)
+for density in sorted((root / 'icons').glob('mipmap-*')):
+    (res / density.name).mkdir(exist_ok=True)
+    for png in density.glob('*.png'):
+        shutil.copy2(png, res / density.name / png.name)
+(res / 'mipmap-anydpi-v26').mkdir(exist_ok=True)
+(res / 'mipmap-anydpi-v26/ic_launcher.xml').write_text('''<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>''')
+(res / 'values').mkdir(exist_ok=True)
+(res / 'values/ic_launcher_background.xml').write_text('<?xml version="1.0" encoding="utf-8"?><resources><color name="ic_launcher_background">#054333</color></resources>')
 activity = main / 'kotlin/com/meskander/amartaka/MainActivity.kt'
 activity.write_text('''package com.meskander.amartaka
 import android.os.Bundle
-import android.view.WindowManager
 import io.flutter.embedding.android.FlutterFragmentActivity
 class MainActivity: FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Prevent screenshots and app-switcher snapshots in production.
-        // Debug builds permit screenshots for testing and store preparation.
-        if ((applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        }
+        // Screenshots and screen recording are allowed.
     }
 }
 ''')
