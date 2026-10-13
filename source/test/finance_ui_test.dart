@@ -15,7 +15,7 @@ import 'package:amartaka/theme/app_theme.dart';
 void main(){
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(()async{
-    await (FontLoader('HindSiliguri')..addFont(rootBundle.load('assets/fonts/HindSiliguri-Regular.ttf'))..addFont(rootBundle.load('assets/fonts/HindSiliguri-SemiBold.ttf'))).load();
+    await (FontLoader('NotoSansBengali')..addFont(rootBundle.load('assets/fonts/NotoSansBengali-Regular.ttf'))..addFont(rootBundle.load('assets/fonts/NotoSansBengali-SemiBold.ttf'))).load();
     await (FontLoader('MaterialIcons')..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
   });
   final sample=Portfolio(holdings:[for(var i=0;i<financeKinds.length;i++){'id':i+1,'kind':financeKinds[i],'title':['হাতের নগদ','আমার ব্যাংক','ভবিষ্যতের সঞ্চয়','মেয়াদি আমানত','পরিবার সঞ্চয়পত্র','শেয়ার পোর্টফোলিও','বন্ধুকে ধার','ব্যক্তিগত ঋণ'][i],'institution':'','reference':'','subtype':'','note':'','amount_minor':i==2?200000:1500000,'value_minor':i==5?1750000:0,'months_paid':4,'rate_bps':850,'active':1,'start':'2026-01-01T00:00:00.000','end':'2027-01-01T00:00:00.000'}]);
