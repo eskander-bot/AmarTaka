@@ -36,9 +36,11 @@ if '--verify-apk' in sys.argv:
         raise SystemExit('Cannot verify APK certificate; refusing to publish artifact.')
     signer = max(candidates, key=lambda p: tuple(int(n) for n in re.findall(r'\d+', p.parent.name)))
     result = subprocess.run([str(signer), 'verify', '--print-certs', str(apk)], capture_output=True, text=True)
-    certs = re.findall(r'Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)', result.stdout)
+    # Old apksigner prints "Signer #1 certificate ...", new versions print
+    # "V2 Signer: certificate ...". Match both; V2/V3 repeat the same cert.
+    certs = list(dict.fromkeys(c.lower() for c in re.findall(r'certificate SHA-256 digest: ([0-9a-fA-F]+)', result.stdout)))
     expected = fingerprint.read_text().strip()
-    if result.returncode or [c.lower() for c in certs] != [expected]:
+    if result.returncode or certs != [expected.lower()]:
         # apksigner verify prints public certificate details only, never the key.
         print('Verifier:', signer, flush=True)
         print('Verifier exit code:', result.returncode, flush=True)
