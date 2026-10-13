@@ -33,6 +33,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0; DateTime _month = DateTime(DateTime.now().year,DateTime.now().month);
   List<Txn> _all = []; List<Map<String,Object?>> _goals = []; List<Map<String,Object?>> _notes = [];
   int _quote = DateTime.now().day+DateTime.now().month*31;
+  final _searchCtl = TextEditingController();
+  @override void dispose() { _searchCtl.dispose(); super.dispose(); }
   Portfolio _portfolio=const Portfolio(); String _profileName='';
   int? _budget; String _search = ''; TxnType? _kind;
   bool _loading = true,_busy = false; String? _error;
@@ -85,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String get _today { final d = DateTime.now(); return '${_weekdays[d.weekday-1]}, ${toBangla('${d.day}')} ${monthNames[d.month-1]} ${toBangla('${d.year}')}'; }
   Future<void> _openSettings() async { await Navigator.push(context,MaterialPageRoute(builder:(_) => Scaffold(appBar:AppBar(title:const Text('সেটিংস')),body:SettingsScreen(onDataChanged:_load)))); if (mounted) await _load(); }
   Future<void> _editNote([Map<String,Object?>? m]) async { await Navigator.push(context,MaterialPageRoute(builder:(_) => ItemEditor(goal:false,item:m))); if (mounted) await _load(); }
-  Widget _title(String text) => Padding(padding:const EdgeInsets.only(top:14,bottom:4),child:Text(text,style:Theme.of(context).textTheme.headlineSmall?.copyWith(color:Theme.of(context).colorScheme.primary)));
+  Widget _title(String text) => Padding(padding:const EdgeInsets.only(top:14,bottom:4),child:Row(children:[Container(width:5,height:24,decoration:BoxDecoration(color:Theme.of(context).colorScheme.primary,borderRadius:BorderRadius.circular(4))),const SizedBox(width:10),Expanded(child:Text(text,style:Theme.of(context).textTheme.headlineSmall))]));
   Widget _header() {
     final cs = Theme.of(context).colorScheme;
     final initial = _profileName.isEmpty ? 'আ' : String.fromCharCode(_profileName.runes.first);
@@ -138,19 +140,21 @@ class _HomeScreenState extends State<HomeScreen> {
       final rows = _all.where((t) => t.date.year == d.year && t.date.month == d.month && t.date.day == d.day);
       return DayTotals(_weekdayShort[d.weekday-1],_sum(rows,TxnType.income),_sum(rows,TxnType.expense));
     });
+    final tileRow = big
+        ? Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[for (final t in tiles) Padding(padding:const EdgeInsets.only(bottom:8),child:t)])
+        : Row(crossAxisAlignment:CrossAxisAlignment.start,children:[for (var i = 0; i < tiles.length; i++) ...[if (i > 0) const SizedBox(width:10),Expanded(child:tiles[i])]]);
     return [
-      _header(),const SizedBox(height:14),
-      QuoteCard(text:_quotes[_quote % _quotes.length],onRefresh:() => setState(() => _quote++)),
+      FadeSlideIn(index:0,child:_header()),const SizedBox(height:14),
+      FadeSlideIn(index:1,child:QuoteCard(text:_quotes[_quote % _quotes.length],onRefresh:() => setState(() => _quote++))),
       _monthPicker(),
-      DashboardBalanceCard(balance:balance,income:income,expense:expense,savingsRate:FinanceMath.savingsRate(income,expense)),
+      FadeSlideIn(index:2,child:DashboardBalanceCard(balance:balance,income:income,expense:expense,savingsRate:FinanceMath.savingsRate(income,expense))),
       const SizedBox(height:12),
-      if (big) Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[for (final t in tiles) Padding(padding:const EdgeInsets.only(bottom:8),child:t)])
-      else Row(crossAxisAlignment:CrossAxisAlignment.start,children:[for (var i = 0; i < tiles.length; i++) ...[if (i > 0) const SizedBox(width:10),Expanded(child:tiles[i])]]),
+      FadeSlideIn(index:3,child:tileRow),
       const SizedBox(height:12),
-      QuickActions(onIncome:() => _editTransaction(null,TxnType.income),onExpense:() => _editTransaction(null,TxnType.expense)),
+      FadeSlideIn(index:4,child:QuickActions(onIncome:() => _editTransaction(null,TxnType.income),onExpense:() => _editTransaction(null,TxnType.expense))),
       const SizedBox(height:8),
-      WeekChartCard(title:'সাপ্তাহিক আয় বনাম ব্যয়',days:week),
-      _budgetCard(),
+      FadeSlideIn(index:5,child:WeekChartCard(title:'সাপ্তাহিক আয় বনাম ব্যয়',days:week)),
+      FadeSlideIn(index:6,child:_budgetCard()),
       _heading('সাম্প্রতিক লেনদেন',action:TextButton(onPressed:() => setState(() => _tab = 1),child:const Text('সব দেখুন'))),
       if (_monthly.isEmpty) _empty('এখনও কোনো লেনদেন নেই।\nনিচের + চেপে আয় বা ব্যয় যোগ করুন।',Icons.receipt_long_outlined),..._monthly.take(8).map(_transaction),
     ];
@@ -159,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Widget> _history() {
     final query = _search.toLowerCase();
     final rows = _monthly.where((t) => (_kind == null || t.type == _kind) && '${categoryLabel(t.category)} ${t.category} ${t.note} ${moneyInput(t.amountMinor)}'.toLowerCase().contains(toEnglish(query))).toList();
-    return [_title('ইতিহাস'),_monthPicker(),TextField(decoration:const InputDecoration(prefixIcon:Icon(Icons.search),hintText:'ক্যাটাগরি, বিবরণ বা টাকা খুঁজুন'),onChanged:(v) => setState(() => _search = v)),const SizedBox(height:12),Wrap(spacing:8,children:[ChoiceChip(label:const Text('সব'),selected:_kind == null,onSelected:(_) => setState(() => _kind = null)),...TxnType.values.map((t) => ChoiceChip(label:Text(t == TxnType.income ? 'আয়' : 'ব্যয়'),selected:_kind == t,onSelected:(_) => setState(() => _kind = t)))]),const SizedBox(height:10),Text('${toBangla('${rows.length}')}টি লেনদেন'),if (rows.isEmpty) _empty('কোনো লেনদেন পাওয়া যায়নি।',Icons.search_off),...List.generate(rows.length,(i)=>Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[if(i==0 || formatDate(rows[i-1].date)!=formatDate(rows[i].date))Padding(padding:const EdgeInsets.only(top:14,bottom:5),child:Text(formatDate(rows[i].date),style:Theme.of(context).textTheme.titleSmall)),_transaction(rows[i])]))];
+    return [_title('ইতিহাস'),_monthPicker(),TextField(controller:_searchCtl,decoration:const InputDecoration(prefixIcon:Icon(Icons.search),hintText:'ক্যাটাগরি, বিবরণ বা টাকা খুঁজুন'),onChanged:(v) => setState(() => _search = v)),const SizedBox(height:12),Wrap(spacing:8,children:[ChoiceChip(label:const Text('সব'),selected:_kind == null,onSelected:(_) => setState(() => _kind = null)),...TxnType.values.map((t) => ChoiceChip(label:Text(t == TxnType.income ? 'আয়' : 'ব্যয়'),selected:_kind == t,onSelected:(_) => setState(() => _kind = t)))]),const SizedBox(height:10),Text('${toBangla('${rows.length}')}টি লেনদেন'),if (rows.isEmpty) _empty('কোনো লেনদেন পাওয়া যায়নি।',Icons.search_off),...List.generate(rows.length,(i)=>Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[if(i==0 || formatDate(rows[i-1].date)!=formatDate(rows[i].date))Padding(padding:const EdgeInsets.only(top:14,bottom:5),child:Text(formatDate(rows[i].date),style:Theme.of(context).textTheme.titleSmall)),_transaction(rows[i])]))];
   }
   List<Widget> _budgetTab() => [
     _title('বাজেট'),
@@ -188,14 +192,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   @override Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return AnnotatedRegion<SystemUiOverlayStyle>(value:dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,child:Scaffold(
+    final Widget content = _loading
+        ? const Center(key:ValueKey('loading'),child:CircularProgressIndicator())
+        : _error != null
+            ? Center(key:const ValueKey('error'),child:Column(mainAxisSize:MainAxisSize.min,children:[Text(_error!),TextButton(onPressed:_load,child:const Text('আবার চেষ্টা'))]))
+            : KeyedSubtree(key:ValueKey('tab$_tab'),child:RefreshIndicator(onRefresh:_load,child:ListView(primary:false,physics:const BouncingScrollPhysics(parent:AlwaysScrollableScrollPhysics()),padding:const EdgeInsets.fromLTRB(20,0,20,96),children:switch (_tab) { 0 => _dashboard(),1 => _history(),2 => _reports(),3 => _budgetTab(),4 => _goalsTab(),_ => _notesTab() })));
+    return AnnotatedRegion<SystemUiOverlayStyle>(value:dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,child:PopScope(canPop:_tab == 0,onPopInvokedWithResult:(didPop,_) { if (!didPop) setState(() => _tab = 0); },child:Scaffold(
       bottomNavigationBar:AppBottomBar(selected:_tab,onSelect:(i) => setState(() => _tab = i)),
       floatingActionButton:switch (_tab) {
-        4 => FloatingActionButton(onPressed:() => _editGoal(),tooltip:'নতুন লক্ষ্য',child:const Icon(Icons.add)),
-        5 => FloatingActionButton(onPressed:() => _editNote(),tooltip:'নতুন নোট',child:const Icon(Icons.add)),
-        _ => FloatingActionButton(onPressed:() => _editTransaction(),tooltip:'নতুন লেনদেন',child:const Icon(Icons.add)),
+        4 => FloatingActionButton(heroTag:null,onPressed:() => _editGoal(),tooltip:'নতুন লক্ষ্য',child:const Icon(Icons.add)),
+        5 => FloatingActionButton(heroTag:null,onPressed:() => _editNote(),tooltip:'নতুন নোট',child:const Icon(Icons.add)),
+        _ => FloatingActionButton(heroTag:null,onPressed:() => _editTransaction(),tooltip:'নতুন লেনদেন',child:const Icon(Icons.add)),
       },
-      body:SafeArea(bottom:false,child:_loading ? const Center(child:CircularProgressIndicator()) : _error != null ? Center(child:Column(mainAxisSize:MainAxisSize.min,children:[Text(_error!),TextButton(onPressed:_load,child:const Text('আবার চেষ্টা'))])) : RefreshIndicator(onRefresh:_load,child:ListView(physics:const AlwaysScrollableScrollPhysics(),padding:const EdgeInsets.fromLTRB(20,0,20,96),children:switch (_tab) { 0 => _dashboard(),1 => _history(),2 => _reports(),3 => _budgetTab(),4 => _goalsTab(),_ => _notesTab() }))),
-    ));
+      body:SafeArea(bottom:false,child:AnimatedSwitcher(duration:const Duration(milliseconds:260),switchInCurve:Curves.easeOutCubic,transitionBuilder:(child,animation) => FadeTransition(opacity:animation,child:SlideTransition(position:Tween<Offset>(begin:const Offset(0.03,0),end:Offset.zero).animate(animation),child:child)),child:content)),
+    )));
   }
 }
