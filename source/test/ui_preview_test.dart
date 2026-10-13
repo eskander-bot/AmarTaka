@@ -12,9 +12,9 @@ import 'package:amartaka/theme/app_theme.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
-    final loader = FontLoader('HindSiliguri')
-      ..addFont(rootBundle.load('assets/fonts/HindSiliguri-Regular.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/HindSiliguri-SemiBold.ttf'));
+    final loader = FontLoader('NotoSansBengali')
+      ..addFont(rootBundle.load('assets/fonts/NotoSansBengali-Regular.ttf'))
+      ..addFont(rootBundle.load('assets/fonts/NotoSansBengali-SemiBold.ttf'));
     await loader.load();
     final icons = FontLoader('MaterialIcons')
       ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
