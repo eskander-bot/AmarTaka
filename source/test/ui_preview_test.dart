@@ -52,6 +52,7 @@ void main() {
         File('${dir.path}/dashboard-$variant.png').writeAsBytesSync(bytes!.buffer.asUint8List());
         image.dispose();
       });
+      await tester.scrollUntilVisible(find.byTooltip('ব্যালেন্স আড়াল করুন'),200,scrollable:find.byType(Scrollable).first);
       await tester.tap(find.byTooltip('ব্যালেন্স আড়াল করুন'));
       await tester.pumpAndSettle();
       expect(find.text('৳ ••••••'),findsOneWidget);
