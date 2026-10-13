@@ -38,14 +38,8 @@ if '--verify-apk' in sys.argv:
     result = subprocess.run([str(signer), 'verify', '--print-certs', str(apk)], capture_output=True, text=True)
     certs = re.findall(r'Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)', result.stdout)
     expected = fingerprint.read_text().strip()
-        if result.returncode or [c.lower() for c in certs] != [expected]:
-        print('Verifier:', signer, flush=True)
-        print('Exit code:', result.returncode, flush=True)
-        print('Expected certificate:', expected, flush=True)
-        print('Detected certificates:', certs, flush=True)
-        print('Details:', result.stdout, flush=True)
-        print('Errors:', result.stderr, flush=True)
-        raise SystemExit('Certificate check failed; see details above.')
+    if result.returncode or [c.lower() for c in certs] != [expected]:
+        raise SystemExit('APK signature verification failed or certificate differs from permanent key.')
     print('Verified permanent signing certificate SHA-256:', expected)
     raise SystemExit
 
