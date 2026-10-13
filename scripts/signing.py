@@ -39,7 +39,20 @@ if '--verify-apk' in sys.argv:
     certs = re.findall(r'Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)', result.stdout)
     expected = fingerprint.read_text().strip()
     if result.returncode or [c.lower() for c in certs] != [expected]:
-        raise SystemExit('APK signature verification failed or certificate differs from permanent key.')
+        # apksigner verify prints public certificate details only, never the key.
+        print('Verifier:', signer, flush=True)
+        print('Verifier exit code:', result.returncode, flush=True)
+        print('Expected certificate SHA-256:', expected, flush=True)
+        print('Detected certificate SHA-256:', ', '.join(certs) or '(not parsed)', flush=True)
+        print('--- apksigner stdout ---', flush=True)
+        print(result.stdout[:12000] or '(empty)', flush=True)
+        print('--- apksigner stderr ---', flush=True)
+        print(result.stderr[:12000] or '(empty)', flush=True)
+        if result.returncode:
+            raise SystemExit('APK signature verifier returned an error; see details above.')
+        if not certs:
+            raise SystemExit('No signer fingerprint parsed; see public certificate output above.')
+        raise SystemExit('APK certificate does not match the permanent key; artifact upload blocked.')
     print('Verified permanent signing certificate SHA-256:', expected)
     raise SystemExit
 
