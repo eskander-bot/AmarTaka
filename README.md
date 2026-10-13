@@ -41,7 +41,7 @@ Edit **source/lib/**, not the generated `.build/amartaka/lib/`. Re-run bootstrap
 
 ## APK through GitHub
 
-Pushes on `main` or `codex/**` and pull requests run analysis, tests and debug APK build. Download the **Amar-Taka-test-APK** artifact from the successful Actions run. Extract its ZIP and install `app-debug.apk` on your test phone. This is not a store-signed release.
+Pushes on `main` or `codex/**` and pull requests run analysis and tests. Pushes to `main` also build a release APK signed with the permanent upload key and verify its certificate before upload. Download the **Amar-Taka-test-APK** artifact from the successful Actions run, extract its ZIP and install `app-release.apk` on your test phone. This is not a Play Store release.
 
 Dependency versions are pinned directly in `source/pubspec.yaml`. The build artifact includes the resolved `pubspec.lock`; check it into `source/` after the first successful build to also lock transitive versions.
 
