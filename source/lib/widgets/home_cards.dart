@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../utils/formatters.dart';
 
@@ -79,6 +80,7 @@ class _DashboardBalanceCardState extends State<DashboardBalanceCard> {
     final savingColor = dark ? const Color(0xFFFFE08A) : const Color(0xFFB45309);
     final wide = MediaQuery.textScalerOf(context).scale(14) <= 22;
     final rate = widget.savingsRate.clamp(0.0, 100.0);
+    final amountStyle = TextStyle(color: main, fontSize: 36, height: 1.3, fontWeight: FontWeight.w600);
 
     Widget stat(String label, String value, Color color) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,14 +98,32 @@ class _DashboardBalanceCardState extends State<DashboardBalanceCard> {
         );
 
     const hidden = '৳ ••••';
-    final stats = [
+    final stats = <Widget>[
       stat('আয় (মাসিক)', _visible ? formatMinor(widget.income) : hidden, incomeColor),
       stat('খরচ (মাসিক)', _visible ? formatMinor(widget.expense) : hidden, expenseColor),
-      stat('সঞ্চয়', '${toBangla(rate.toStringAsFixed(0))}%', savingColor),
+      Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0.0, end: rate / 100),
+          duration: const Duration(milliseconds: 900),
+          curve: Curves.easeOutCubic,
+          builder: (context, v, _) => SizedBox(
+            width: 34,
+            height: 34,
+            child: CircularProgressIndicator(
+              value: v,
+              strokeWidth: 4,
+              color: savingColor,
+              backgroundColor: soft.withValues(alpha: 0.25),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: stat('সঞ্চয়', '${toBangla(rate.toStringAsFixed(0))}%', savingColor)),
+      ]),
     ];
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 12, 18),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: dark ? const Color(0xFF14674B) : const Color(0xFF9FE3C4)),
@@ -115,45 +135,64 @@ class _DashboardBalanceCardState extends State<DashboardBalanceCard> {
               : const [Color(0xFFDDF8EA), Color(0xFFBDEFD5)],
         ),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: Text('মোট ব্যালেন্স', style: TextStyle(color: soft, fontSize: 13))),
-          IconButton(
-            tooltip: _visible ? 'ব্যালেন্স আড়াল করুন' : 'ব্যালেন্স দেখুন',
-            onPressed: () => setState(() => _visible = !_visible),
-            icon: Icon(_visible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                color: soft, size: 20),
+      child: Stack(children: [
+        Positioned(
+          right: -6,
+          bottom: -34,
+          child: IgnorePointer(
+            child: Text('৳',
+                style: TextStyle(
+                    fontSize: 150, height: 1, fontWeight: FontWeight.w600, color: main.withValues(alpha: 0.07))),
           ),
-        ]),
+        ),
         Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: Semantics(
-            label: _visible ? 'মোট ব্যালেন্স ${formatMinor(widget.balance)}' : 'ব্যালেন্স আড়াল করা আছে',
-            excludeSemantics: true,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(_visible ? formatMinor(widget.balance) : '৳ ••••••',
-                  maxLines: 1,
-                  style: TextStyle(color: main, fontSize: 36, height: 1.3, fontWeight: FontWeight.w600)),
+          padding: const EdgeInsets.fromLTRB(20, 12, 12, 18),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text('মোট ব্যালেন্স', style: TextStyle(color: soft, fontSize: 13))),
+              IconButton(
+                tooltip: _visible ? 'ব্যালেন্স আড়াল করুন' : 'ব্যালেন্স দেখুন',
+                onPressed: () => setState(() => _visible = !_visible),
+                icon: Icon(_visible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                    color: soft, size: 20),
+              ),
+            ]),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Semantics(
+                label: _visible ? 'মোট ব্যালেন্স ${formatMinor(widget.balance)}' : 'ব্যালেন্স আড়াল করা আছে',
+                excludeSemantics: true,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: _visible
+                      ? TweenAnimationBuilder<double>(
+                          tween: Tween<double>(begin: 0.0, end: widget.balance.toDouble()),
+                          duration: const Duration(milliseconds: 900),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, v, _) => Text(formatMinor(v.round()), maxLines: 1, style: amountStyle),
+                        )
+                      : Text('৳ ••••••', maxLines: 1, style: amountStyle),
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: Divider(color: soft.withValues(alpha: 0.35), height: 1),
-        ),
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.only(right: 8),
-          child: wide
-              ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  for (final s in stats) Expanded(child: s),
-                ])
-              : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  for (final s in stats) Padding(padding: const EdgeInsets.only(bottom: 10), child: s),
-                ]),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Divider(color: soft.withValues(alpha: 0.35), height: 1),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: wide
+                  ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      for (final s in stats) Expanded(child: s),
+                    ])
+                  : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      for (final s in stats) Padding(padding: const EdgeInsets.only(bottom: 10), child: s),
+                    ]),
+            ),
+          ]),
         ),
       ]),
     );
@@ -227,11 +266,16 @@ class WeekChartCard extends StatelessWidget {
     final expenseColor = AppColors.expenseFor(context);
     final peak = days.fold<int>(1, (m, d) => math.max(m, math.max(d.income, d.expense)));
 
-    Widget bar(int value, Color color) => Container(
-          width: 8,
-          height: math.max(3.0, 110.0 * value / peak),
-          margin: const EdgeInsets.symmetric(horizontal: 1.5),
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+    Widget bar(int value, Color color) => TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0.0, end: 110.0 * value / peak),
+          duration: const Duration(milliseconds: 800),
+          curve: Curves.easeOutCubic,
+          builder: (context, h, _) => Container(
+            width: 8,
+            height: math.max(3.0, h),
+            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+          ),
         );
 
     Widget legend(String text, Color color) => Row(mainAxisSize: MainAxisSize.min, children: [
@@ -283,7 +327,7 @@ class WeekChartCard extends StatelessWidget {
   }
 }
 
-/// Bottom navigation with six tabs. Labels never overflow at large text sizes.
+/// Bottom navigation with six tabs: sliding pill, small bounce, light haptic tick.
 class AppBottomBar extends StatelessWidget {
   final int selected;
   final ValueChanged<int> onSelect;
@@ -317,12 +361,31 @@ class AppBottomBar extends StatelessWidget {
                   Expanded(
                     child: InkWell(
                       borderRadius: BorderRadius.circular(14),
-                      onTap: () => onSelect(i),
+                      onTap: () {
+                        if (i != selected) HapticFeedback.selectionClick();
+                        onSelect(i);
+                      },
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 5),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(i == selected ? items[i].$2 : items[i].$1,
-                              size: 23, color: i == selected ? cs.primary : cs.onSurfaceVariant),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 240),
+                            curve: Curves.easeOutCubic,
+                            width: i == selected ? 48 : 26,
+                            height: 30,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: i == selected ? cs.primaryContainer : Colors.transparent,
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: AnimatedScale(
+                              scale: i == selected ? 1.12 : 1.0,
+                              duration: const Duration(milliseconds: 240),
+                              curve: Curves.easeOutBack,
+                              child: Icon(i == selected ? items[i].$2 : items[i].$1,
+                                  size: 22, color: i == selected ? cs.primary : cs.onSurfaceVariant),
+                            ),
+                          ),
                           const SizedBox(height: 3),
                           Text(items[i].$3,
                               maxLines: 1,
@@ -343,4 +406,21 @@ class AppBottomBar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Fades and lifts its child in once, with a small delay per index.
+class FadeSlideIn extends StatelessWidget {
+  final int index;
+  final Widget child;
+  const FadeSlideIn({super.key, this.index = 0, required this.child});
+
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 0.0, end: 1.0),
+        duration: Duration(milliseconds: 380 + 70 * math.min(index, 8)),
+        curve: Curves.easeOutCubic,
+        builder: (context, t, child) =>
+            Opacity(opacity: t, child: Transform.translate(offset: Offset(0, 18 * (1 - t)), child: child)),
+        child: child,
+      );
 }
