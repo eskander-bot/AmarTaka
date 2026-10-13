@@ -41,7 +41,10 @@ s = s.replace('buildTypes {', '''signingConfigs {
         }
     }
     buildTypes {
-        getByName("debug") { applicationIdSuffix = ".preview" }
+        getByName("debug") {
+            applicationIdSuffix = ".preview"
+            signingConfig = if (keyPropertiesFile.exists()) signingConfigs.getByName("upload") else null
+        }
 ''')
 s = s.replace('signingConfig = signingConfigs.getByName("debug")', 'signingConfig = if (keyPropertiesFile.exists()) signingConfigs.getByName("upload") else null')
 s += '\ndependencies { coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4") }\n'
