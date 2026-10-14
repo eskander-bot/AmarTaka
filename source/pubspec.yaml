@@ -25,6 +25,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/fonts/OFL.txt
+    - assets/logo/app_logo.png
   fonts:
     - family: NotoSansBengali
       fonts:
