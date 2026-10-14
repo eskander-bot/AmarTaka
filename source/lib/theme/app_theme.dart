@@ -11,11 +11,11 @@ class AppColors {
 class AppTheme {
   static ThemeData _build(Brightness brightness,{bool black = false}) {
     final dark = brightness == Brightness.dark;
-    final bg = black ? Colors.black : dark ? const Color(0xFF0A101C) : const Color(0xFFF6F8FB);
-    final surface = black ? const Color(0xFF0E131D) : dark ? const Color(0xFF18212F) : Colors.white;
+    final bg = black ? Colors.black : dark ? const Color(0xFF0B131B) : const Color(0xFFF3F7F6);
+    final surface = black ? const Color(0xFF0E131D) : dark ? const Color(0xFF15232C) : Colors.white;
     final ink = dark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
     final muted = dark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final line = black ? const Color(0xFF1F2937) : dark ? const Color(0xFF2A3547) : const Color(0xFFE3E9F0);
+    final line = black ? const Color(0xFF1F2937) : dark ? const Color(0xFF283B44) : const Color(0xFFE1EAE6);
     final scheme = ColorScheme.fromSeed(seedColor:AppColors.primary,brightness:brightness).copyWith(
       primary:dark ? const Color(0xFF1FD991) : AppColors.primary,
       onPrimary:dark ? const Color(0xFF04281B) : Colors.white,
@@ -35,7 +35,9 @@ class AppTheme {
     return ThemeData(useMaterial3:true,fontFamily:'NotoSansBengali',textTheme:text,colorScheme:scheme,scaffoldBackgroundColor:bg,
       appBarTheme:AppBarTheme(backgroundColor:bg,surfaceTintColor:Colors.transparent,elevation:0,scrolledUnderElevation:0,centerTitle:false,titleSpacing:20,titleTextStyle:text.titleLarge,systemOverlayStyle:dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark),
       inputDecorationTheme:InputDecorationTheme(contentPadding:const EdgeInsets.symmetric(horizontal:16,vertical:15),border:OutlineInputBorder(borderRadius:BorderRadius.circular(16),borderSide:BorderSide(color:line)),enabledBorder:OutlineInputBorder(borderRadius:BorderRadius.circular(16),borderSide:BorderSide(color:line)),filled:true,fillColor:surface),
-      cardTheme:CardThemeData(margin:const EdgeInsets.symmetric(vertical:5),elevation:0,color:surface,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(20),side:BorderSide(color:line))),
+      cardTheme:CardThemeData(margin:const EdgeInsets.symmetric(vertical:5),elevation:0,color:surface,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(22),side:BorderSide(color:line))),
+      listTileTheme:const ListTileThemeData(contentPadding:EdgeInsets.symmetric(horizontal:16,vertical:6)),
+      snackBarTheme:SnackBarThemeData(behavior:SnackBarBehavior.floating,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(16))),
       dividerTheme:DividerThemeData(color:line,thickness:1),
       navigationBarTheme:NavigationBarThemeData(height:70,backgroundColor:surface,indicatorColor:scheme.primaryContainer,labelTextStyle:WidgetStateProperty.resolveWith((s) => TextStyle(fontFamily:'NotoSansBengali',fontSize:11,fontWeight:s.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w400,color:s.contains(WidgetState.selected) ? scheme.primary : muted)),iconTheme:WidgetStateProperty.resolveWith((s) => IconThemeData(size:22,color:s.contains(WidgetState.selected) ? scheme.primary : muted))),
       progressIndicatorTheme:ProgressIndicatorThemeData(color:scheme.primary,linearTrackColor:line,linearMinHeight:6),
