@@ -52,7 +52,7 @@ class QuoteCard extends StatelessWidget {
   }
 }
 
-/// Big balance card with monthly income, expense and savings rate.
+/// Big balance card: balance on top, then income | expense | savings with dividers.
 class DashboardBalanceCard extends StatefulWidget {
   final int balance, income, expense;
   final double savingsRate;
@@ -65,6 +65,12 @@ class DashboardBalanceCard extends StatefulWidget {
   });
   @override
   State<DashboardBalanceCard> createState() => _DashboardBalanceCardState();
+}
+
+String _short(int minor) {
+  final text = formatMinor(minor);
+  final tail = toBangla('.00');
+  return text.endsWith(tail) ? text.substring(0, text.length - tail.length) : text;
 }
 
 class _DashboardBalanceCardState extends State<DashboardBalanceCard> {
@@ -80,47 +86,52 @@ class _DashboardBalanceCardState extends State<DashboardBalanceCard> {
     final savingColor = dark ? const Color(0xFFFFE08A) : const Color(0xFFB45309);
     final wide = MediaQuery.textScalerOf(context).scale(14) <= 22;
     final rate = widget.savingsRate.clamp(0.0, 100.0);
-    final amountStyle = TextStyle(color: main, fontSize: 36, height: 1.3, fontWeight: FontWeight.w600);
+    final amountStyle = TextStyle(color: main, fontSize: 38, height: 1.3, fontWeight: FontWeight.w700);
 
-    Widget stat(String label, String value, Color color) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    Widget cell(String label, Widget value) => Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label, style: TextStyle(color: soft, fontSize: 11)),
-            const SizedBox(height: 4),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(value,
-                  maxLines: 1,
-                  style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w600)),
-            ),
+            Text(label, textAlign: TextAlign.center, style: TextStyle(color: soft, fontSize: 12)),
+            const SizedBox(height: 6),
+            value,
           ],
+        );
+    Widget money(String text, Color color) => FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(text, maxLines: 1, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w700)),
         );
 
     const hidden = '৳ ••••';
-    final stats = <Widget>[
-      stat('আয় (মাসিক)', _visible ? formatMinor(widget.income) : hidden, incomeColor),
-      stat('খরচ (মাসিক)', _visible ? formatMinor(widget.expense) : hidden, expenseColor),
-      Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        TweenAnimationBuilder<double>(
-          tween: Tween<double>(begin: 0.0, end: rate / 100),
-          duration: const Duration(milliseconds: 900),
-          curve: Curves.easeOutCubic,
-          builder: (context, v, _) => SizedBox(
-            width: 34,
-            height: 34,
+    final ring = TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: rate / 100),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeOutCubic,
+      builder: (context, v, _) => SizedBox(
+        width: 40,
+        height: 40,
+        child: Stack(alignment: Alignment.center, children: [
+          SizedBox(
+            width: 40,
+            height: 40,
             child: CircularProgressIndicator(
               value: v,
-              strokeWidth: 4,
+              strokeWidth: 4.5,
+              strokeCap: StrokeCap.round,
               color: savingColor,
               backgroundColor: soft.withValues(alpha: 0.25),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(child: stat('সঞ্চয়', '${toBangla(rate.toStringAsFixed(0))}%', savingColor)),
-      ]),
+          Text('${toBangla(rate.toStringAsFixed(0))}%',
+              style: TextStyle(color: savingColor, fontSize: 10, fontWeight: FontWeight.w700)),
+        ]),
+      ),
+    );
+    final cells = <Widget>[
+      cell('আয় (মাসিক)', money(_visible ? _short(widget.income) : hidden, incomeColor)),
+      cell('খরচ (মাসিক)', money(_visible ? _short(widget.expense) : hidden, expenseColor)),
+      cell('সঞ্চয়', ring),
     ];
+    final line = soft.withValues(alpha: 0.35);
 
     return Container(
       clipBehavior: Clip.antiAlias,
@@ -138,7 +149,7 @@ class _DashboardBalanceCardState extends State<DashboardBalanceCard> {
       child: Stack(children: [
         Positioned(
           right: -6,
-          bottom: -34,
+          top: -26,
           child: IgnorePointer(
             child: Text('৳',
                 style: TextStyle(
@@ -149,12 +160,12 @@ class _DashboardBalanceCardState extends State<DashboardBalanceCard> {
           padding: const EdgeInsets.fromLTRB(20, 12, 12, 18),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Expanded(child: Text('মোট ব্যালেন্স', style: TextStyle(color: soft, fontSize: 13))),
+              Expanded(child: Text('মোট ব্যালেন্স', style: TextStyle(color: soft, fontSize: 14))),
               IconButton(
                 tooltip: _visible ? 'ব্যালেন্স আড়াল করুন' : 'ব্যালেন্স দেখুন',
                 onPressed: () => setState(() => _visible = !_visible),
                 icon: Icon(_visible ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                    color: soft, size: 20),
+                    color: soft, size: 22),
               ),
             ]),
             Padding(
@@ -170,27 +181,40 @@ class _DashboardBalanceCardState extends State<DashboardBalanceCard> {
                           tween: Tween<double>(begin: 0.0, end: widget.balance.toDouble()),
                           duration: const Duration(milliseconds: 900),
                           curve: Curves.easeOutCubic,
-                          builder: (context, v, _) => Text(formatMinor(v.round()), maxLines: 1, style: amountStyle),
+                          builder: (context, v, _) => Text(
+                              (v - widget.balance).abs() < 50 ? _short(widget.balance) : _short(v.round() ~/ 100 * 100),
+                              maxLines: 1,
+                              style: amountStyle),
                         )
                       : Text('৳ ••••••', maxLines: 1, style: amountStyle),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: Divider(color: soft.withValues(alpha: 0.35), height: 1),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: wide
-                  ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      for (final s in stats) Expanded(child: s),
-                    ])
-                  : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      for (final s in stats) Padding(padding: const EdgeInsets.only(bottom: 10), child: s),
-                    ]),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: main.withValues(alpha: dark ? 0.08 : 0.28),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: wide
+                    ? Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                        Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: cells[0])),
+                        Container(width: 1, height: 56, color: line),
+                        Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: cells[1])),
+                        Container(width: 1, height: 56, color: line),
+                        Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 6), child: cells[2])),
+                      ])
+                    : Column(children: [
+                        cells[0],
+                        Divider(color: line, height: 20),
+                        cells[1],
+                        Divider(color: line, height: 20),
+                        cells[2],
+                      ]),
+              ),
             ),
           ]),
         ),
@@ -327,19 +351,19 @@ class WeekChartCard extends StatelessWidget {
   }
 }
 
-/// Bottom navigation with six tabs: sliding pill, small bounce, light haptic tick.
+/// Bottom navigation with six colourful tabs: sliding pill, small bounce, light haptic tick.
 class AppBottomBar extends StatelessWidget {
   final int selected;
   final ValueChanged<int> onSelect;
   const AppBottomBar({super.key, required this.selected, required this.onSelect});
 
-  static const items = <(IconData, IconData, String)>[
-    (Icons.home_outlined, Icons.home_rounded, 'হোম'),
-    (Icons.receipt_long_outlined, Icons.receipt_long_rounded, 'ইতিহাস'),
-    (Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'বিশ্লেষণ'),
-    (Icons.track_changes_outlined, Icons.track_changes_rounded, 'বাজেট'),
-    (Icons.star_outline_rounded, Icons.star_rounded, 'ইচ্ছা'),
-    (Icons.edit_note_outlined, Icons.edit_note_rounded, 'নোট'),
+  static const items = <(IconData, IconData, String, Color)>[
+    (Icons.home_outlined, Icons.home_rounded, 'হোম', Color(0xFF10B981)),
+    (Icons.receipt_long_outlined, Icons.receipt_long_rounded, 'ইতিহাস', Color(0xFF3B82F6)),
+    (Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'বিশ্লেষণ', Color(0xFF8B5CF6)),
+    (Icons.track_changes_outlined, Icons.track_changes_rounded, 'বাজেট', Color(0xFFF59E0B)),
+    (Icons.star_outline_rounded, Icons.star_rounded, 'ইচ্ছা', Color(0xFFEC4899)),
+    (Icons.edit_note_outlined, Icons.edit_note_rounded, 'নোট', Color(0xFF06B6D4)),
   ];
 
   @override
@@ -371,19 +395,22 @@ class AppBottomBar extends StatelessWidget {
                           AnimatedContainer(
                             duration: const Duration(milliseconds: 240),
                             curve: Curves.easeOutCubic,
-                            width: i == selected ? 48 : 26,
-                            height: 30,
+                            width: i == selected ? 50 : 28,
+                            height: 32,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: i == selected ? cs.primaryContainer : Colors.transparent,
-                              borderRadius: BorderRadius.circular(15),
+                              color: i == selected ? items[i].$4.withValues(alpha: 0.18) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(16),
                             ),
                             child: AnimatedScale(
                               scale: i == selected ? 1.12 : 1.0,
                               duration: const Duration(milliseconds: 240),
                               curve: Curves.easeOutBack,
                               child: Icon(i == selected ? items[i].$2 : items[i].$1,
-                                  size: 22, color: i == selected ? cs.primary : cs.onSurfaceVariant),
+                                  size: 24,
+                                  color: i == selected
+                                      ? items[i].$4
+                                      : Color.lerp(cs.onSurfaceVariant, items[i].$4, 0.5)),
                             ),
                           ),
                           const SizedBox(height: 3),
@@ -391,9 +418,11 @@ class AppBottomBar extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: i == selected ? FontWeight.w600 : FontWeight.w400,
-                                color: i == selected ? cs.primary : cs.onSurfaceVariant,
+                                fontSize: 11,
+                                fontWeight: i == selected ? FontWeight.w700 : FontWeight.w500,
+                                color: i == selected
+                                    ? items[i].$4
+                                    : Color.lerp(cs.onSurfaceVariant, items[i].$4, 0.35),
                               )),
                         ]),
                       ),
@@ -423,4 +452,105 @@ class FadeSlideIn extends StatelessWidget {
             Opacity(opacity: t, child: Transform.translate(offset: Offset(0, 18 * (1 - t)), child: child)),
         child: child,
       );
+}
+
+/// Text filled with a green-to-blue gradient.
+class GradientText extends StatelessWidget {
+  final String text;
+  final TextStyle? style;
+  final int? maxLines;
+  const GradientText(this.text, {super.key, this.style, this.maxLines});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (rect) =>
+          LinearGradient(colors: [cs.primary, const Color(0xFF2DB6E8)]).createShader(rect),
+      child: Text(text,
+          maxLines: maxLines,
+          overflow: maxLines == null ? null : TextOverflow.ellipsis,
+          style: (style ?? const TextStyle()).copyWith(color: Colors.white)),
+    );
+  }
+}
+
+/// Two big colourful add buttons: expense (red) and income (green).
+class QuickAddRow extends StatelessWidget {
+  final VoidCallback onIncome, onExpense;
+  const QuickAddRow({super.key, required this.onIncome, required this.onExpense});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget button(String label, IconData icon, List<Color> colors, VoidCallback onTap) => Material(
+          color: Colors.transparent,
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: LinearGradient(colors: colors),
+              boxShadow: [BoxShadow(color: colors.last.withValues(alpha: 0.30), blurRadius: 14, offset: const Offset(0, 6))],
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 12),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(icon, color: Colors.white, size: 21),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        );
+    final buttons = [
+      button('ব্যয় যোগ', Icons.remove_circle_outline, const [Color(0xFFFF6B6B), Color(0xFFE11D48)], onExpense),
+      button('আয় যোগ', Icons.add_circle_outline, const [Color(0xFF10B981), Color(0xFF047857)], onIncome),
+    ];
+    if (MediaQuery.textScalerOf(context).scale(14) > 22) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        buttons[0],
+        const SizedBox(height: 10),
+        buttons[1],
+      ]);
+    }
+    return Row(children: [
+      Expanded(child: buttons[0]),
+      const SizedBox(width: 12),
+      Expanded(child: buttons[1]),
+    ]);
+  }
+}
+
+/// A colour and icon for each category, so lists are easy to scan.
+class CategoryStyle {
+  final IconData icon;
+  final Color color;
+  const CategoryStyle(this.icon, this.color);
+
+  static const _styles = <String, CategoryStyle>{
+    'Bazar': CategoryStyle(Icons.shopping_basket_rounded, Color(0xFFF97316)),
+    'Transport': CategoryStyle(Icons.directions_bus_rounded, Color(0xFF3B82F6)),
+    'Bills': CategoryStyle(Icons.receipt_long_rounded, Color(0xFFEAB308)),
+    'Health': CategoryStyle(Icons.favorite_rounded, Color(0xFFEF4444)),
+    'Education': CategoryStyle(Icons.school_rounded, Color(0xFF8B5CF6)),
+    'Entertainment': CategoryStyle(Icons.movie_rounded, Color(0xFFEC4899)),
+    'Salary': CategoryStyle(Icons.payments_rounded, Color(0xFF10B981)),
+    'Freelance': CategoryStyle(Icons.laptop_mac_rounded, Color(0xFF06B6D4)),
+    'Business': CategoryStyle(Icons.storefront_rounded, Color(0xFF14B8A6)),
+    'Gift': CategoryStyle(Icons.card_giftcard_rounded, Color(0xFFF43F5E)),
+    'Misc': CategoryStyle(Icons.category_rounded, Color(0xFF64748B)),
+  };
+
+  static CategoryStyle of(String category, bool income) =>
+      _styles[category] ??
+      CategoryStyle(income ? Icons.south_west_rounded : Icons.north_east_rounded,
+          income ? const Color(0xFF10B981) : const Color(0xFFEF4444));
 }
