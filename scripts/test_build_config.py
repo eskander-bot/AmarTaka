@@ -17,6 +17,7 @@ class BuildConfigTest(unittest.TestCase):
             root = Path(folder)
             shutil.copytree(ROOT / 'scripts', root / 'scripts')
             shutil.copytree(ROOT / 'source', root / 'source')
+            shutil.copytree(ROOT / 'icons', root / 'icons')
             app = root / '.build/amartaka'
             def fake_flutter(args, **kwargs):
                 self.assertIn('--no-pub', args)
@@ -31,6 +32,16 @@ buildTypes { release { signingConfig = signingConfigs.getByName("debug") } }
 }''')
             with patch('subprocess.run', side_effect=fake_flutter):
                 runpy.run_path(str(root / 'scripts/bootstrap.py'))
+            res = app / 'android/app/src/main/res'
+            self.assertEqual((res / 'drawable-nodpi/amar_taka_logo.png').read_bytes(), (root / 'icons/app_logo.png').read_bytes())
+            adaptive = ET.parse(res / 'mipmap-anydpi-v26/ic_launcher.xml').getroot()
+            android_ns = '{http://schemas.android.com/apk/res/android}'
+            self.assertEqual(adaptive.find('foreground').get(android_ns+'drawable'), '@drawable/amar_taka_icon_foreground')
+            foreground = ET.parse(res / 'drawable/amar_taka_icon_foreground.xml').getroot()
+            inset = foreground.find('item/inset')
+            for side in ('Left', 'Top', 'Right', 'Bottom'):
+                self.assertEqual(inset.get(android_ns+'inset'+side), '18%')
+            self.assertFalse(list(res.glob('mipmap-*/ic_launcher_foreground.png')))
             gradle = (app / 'android/app/build.gradle.kts').read_text()
             self.assertIn('targetSdk = 36', gradle)
             self.assertIn('compileSdk = 36', gradle)
