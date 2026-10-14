@@ -85,12 +85,15 @@ for density in sorted((root / 'icons').glob('mipmap-*')):
 (res / 'mipmap-anydpi-v26').mkdir(exist_ok=True)
 (res / 'mipmap-anydpi-v26/ic_launcher.xml').write_text('''<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background"/>
+    <background android:drawable="@mipmap/ic_launcher_background"/>
     <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
     <monochrome android:drawable="@mipmap/ic_launcher_foreground"/>
 </adaptive-icon>''')
-(res / 'values').mkdir(exist_ok=True)
-(res / 'values/ic_launcher_background.xml').write_text('<?xml version="1.0" encoding="utf-8"?><resources><color name="ic_launcher_background">#054333</color></resources>')
+# In-app logo (lock screen), listed under assets in pubspec.yaml.
+logo = root / 'icons' / 'app_logo.png'
+if logo.exists():
+    (app / 'assets/logo').mkdir(parents=True, exist_ok=True)
+    shutil.copy2(logo, app / 'assets/logo/app_logo.png')
 activity = main / 'kotlin/com/meskander/amartaka/MainActivity.kt'
 activity.write_text('''package com.meskander.amartaka
 import android.os.Bundle
