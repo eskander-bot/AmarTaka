@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
+import 'jewel_icon.dart';
 import '../utils/formatters.dart';
 
 /// Daily short message with a refresh button.
@@ -136,13 +137,13 @@ class _DashboardBalanceCardState extends State<DashboardBalanceCard> {
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(28),
         border: Border.all(color: dark ? const Color(0xFF14674B) : const Color(0xFF9FE3C4)),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: dark
-              ? const [Color(0xFF0B7A55), Color(0xFF064E3B)]
+              ? const [Color(0xFF117D67), Color(0xFF073E35)]
               : const [Color(0xFFDDF8EA), Color(0xFFBDEFD5)],
         ),
       ),
@@ -196,7 +197,7 @@ class _DashboardBalanceCardState extends State<DashboardBalanceCard> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: main.withValues(alpha: dark ? 0.08 : 0.28),
+                  color: Colors.white.withValues(alpha: dark ? 0.08 : 0.45),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: wide
@@ -242,20 +243,12 @@ class StatTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: cs.outlineVariant),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [cs.surface, Color.alphaBlend(color.withValues(alpha: 0.045), cs.surface)]),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.14),
-            borderRadius: BorderRadius.circular(11),
-          ),
-          child: Icon(icon, size: 19, color: color),
-        ),
+        JewelIcon(icon: icon, color: color, size: 38),
         const SizedBox(height: 10),
         FittedBox(
           fit: BoxFit.scaleDown,
@@ -298,7 +291,7 @@ class WeekChartCard extends StatelessWidget {
             width: 8,
             height: math.max(3.0, h),
             margin: const EdgeInsets.symmetric(horizontal: 1.5),
-            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+            decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color.lerp(color, Colors.white, 0.22)!, color]), borderRadius: BorderRadius.circular(4)),
           ),
         );
 
@@ -351,85 +344,80 @@ class WeekChartCard extends StatelessWidget {
   }
 }
 
-/// Bottom navigation with six colourful tabs: sliding pill, small bounce, light haptic tick.
+/// Floating navigation dock with original two-tone illustrations.
 class AppBottomBar extends StatelessWidget {
   final int selected;
   final ValueChanged<int> onSelect;
   const AppBottomBar({super.key, required this.selected, required this.onSelect});
 
-  static const items = <(IconData, IconData, String, Color)>[
-    (Icons.home_outlined, Icons.home_rounded, 'হোম', Color(0xFF10B981)),
-    (Icons.receipt_long_outlined, Icons.receipt_long_rounded, 'ইতিহাস', Color(0xFF3B82F6)),
-    (Icons.bar_chart_outlined, Icons.bar_chart_rounded, 'বিশ্লেষণ', Color(0xFF8B5CF6)),
-    (Icons.track_changes_outlined, Icons.track_changes_rounded, 'বাজেট', Color(0xFFF59E0B)),
-    (Icons.star_outline_rounded, Icons.star_rounded, 'ইচ্ছা', Color(0xFFEC4899)),
-    (Icons.edit_note_outlined, Icons.edit_note_rounded, 'নোট', Color(0xFF06B6D4)),
+  static const items = <(IconData, String, Color)>[
+    (Icons.home_rounded, 'হোম', Color(0xFF10B981)),
+    (Icons.receipt_long_rounded, 'ইতিহাস', Color(0xFF3B82F6)),
+    (Icons.bar_chart_rounded, 'বিশ্লেষণ', Color(0xFF9B77F3)),
+    (Icons.track_changes_rounded, 'বাজেট', Color(0xFFE5A52E)),
+    (Icons.star_rounded, 'ইচ্ছা', Color(0xFFE56AA4)),
+    (Icons.edit_note_rounded, 'নোট', Color(0xFF17B6CB)),
   ];
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(border: Border(top: BorderSide(color: cs.outlineVariant))),
-      child: Material(
-        color: cs.surface,
-        child: SafeArea(
-          top: false,
-          child: MediaQuery.withClampedTextScaling(
-            minScaleFactor: 1,
-            maxScaleFactor: 1.15,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
-              child: Row(children: [
-                for (var i = 0; i < items.length; i++)
-                  Expanded(
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
-                      onTap: () {
-                        if (i != selected) HapticFeedback.selectionClick();
-                        onSelect(i);
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 240),
-                            curve: Curves.easeOutCubic,
-                            width: i == selected ? 50 : 28,
-                            height: 32,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: i == selected ? items[i].$4.withValues(alpha: 0.18) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(16),
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: cs.outlineVariant),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: dark ? 0.18 : 0.06), blurRadius: 24, offset: const Offset(0, 6))],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(26),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              for (var i = 0; i < items.length; i++)
+                Expanded(
+                  child: Semantics(
+                    selected: i == selected,
+                    button: true,
+                    label: items[i].$2,
+                    excludeSemantics: true,
+                    child: Tooltip(
+                      message: items[i].$2,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: () {
+                          if (i != selected) HapticFeedback.selectionClick();
+                          onSelect(i);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            JewelIcon(icon: items[i].$1, color: items[i].$3, size: 34,
+                                selected: i == selected, navigationIndex: i),
+                            const SizedBox(height: 5),
+                            Text(items[i].$2, maxLines: 1, overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 10, fontWeight: i == selected ? FontWeight.w700 : FontWeight.w500,
+                                color: i == selected ? cs.onSurface : cs.onSurfaceVariant)),
+                            const SizedBox(height: 5),
+                            AnimatedContainer(
+                              duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 200),
+                              height: 3, width: i == selected ? 16 : 4,
+                              decoration: BoxDecoration(color: i == selected ? items[i].$3 : Colors.transparent,
+                                borderRadius: BorderRadius.circular(3)),
                             ),
-                            child: AnimatedScale(
-                              scale: i == selected ? 1.12 : 1.0,
-                              duration: const Duration(milliseconds: 240),
-                              curve: Curves.easeOutBack,
-                              child: Icon(i == selected ? items[i].$2 : items[i].$1,
-                                  size: 24,
-                                  color: i == selected
-                                      ? items[i].$4
-                                      : Color.lerp(cs.onSurfaceVariant, items[i].$4, 0.5)),
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(items[i].$3,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: i == selected ? FontWeight.w700 : FontWeight.w500,
-                                color: i == selected
-                                    ? items[i].$4
-                                    : Color.lerp(cs.onSurfaceVariant, items[i].$4, 0.35),
-                              )),
-                        ]),
+                          ]),
+                        ),
                       ),
                     ),
                   ),
-              ]),
-            ),
+                ),
+            ]),
           ),
         ),
       ),
