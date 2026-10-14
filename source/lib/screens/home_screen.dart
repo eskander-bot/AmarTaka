@@ -6,6 +6,7 @@ import '../utils/formatters.dart';
 import '../theme/app_theme.dart';
 import '../widgets/finance_cards.dart';
 import '../widgets/home_cards.dart';
+import '../widgets/jewel_icon.dart';
 import '../widgets/wealth_cards.dart';
 import '../finance/portfolio.dart';
 import '../finance/finance_screen.dart';
@@ -110,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Card(child:InkWell(borderRadius:BorderRadius.circular(20),onTap:() => _editTransaction(t),child:Padding(padding:const EdgeInsets.fromLTRB(14,13,0,13),child:LayoutBuilder(builder:(context,box) {
       final wide = box.maxWidth > 330 && MediaQuery.textScalerOf(context).scale(14) < 19;
       return Row(children:[
-        Container(width:44,height:44,decoration:BoxDecoration(color:style.color.withValues(alpha:0.16),borderRadius:BorderRadius.circular(14)),child:Icon(style.icon,color:style.color,size:23)),const SizedBox(width:12),
+        JewelIcon(icon:style.icon,color:style.color),const SizedBox(width:12),
         Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(categoryLabel(t.category),style:Theme.of(context).textTheme.titleMedium),const SizedBox(height:3),Text('${formatDate(t.date)}${t.note.isEmpty ? '' : ' • ${t.note}'}',maxLines:1,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.bodySmall),if (!wide) ...[const SizedBox(height:5),amount]])),
         if (wide) ...[const SizedBox(width:8),amount],
         PopupMenuButton<String>(tooltip:'লেনদেনের অপশন',icon:Icon(Icons.more_vert,size:19,color:Theme.of(context).colorScheme.onSurfaceVariant),onSelected:(v) { if (v == 'edit') { _editTransaction(t); } else { _delete(t); } },itemBuilder:(_) => const [PopupMenuItem(value:'edit',child:Text('সম্পাদনা')),PopupMenuItem(value:'delete',child:Text('মুছুন'))]),
@@ -120,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _budgetCard() => BudgetCard(spent:_sum(_monthly,TxnType.expense),budget:_budget,onEdit:_setBudget);
   Future<void> _finance() async { await Navigator.push(context,MaterialPageRoute(builder:(_)=>const FinanceScreen())); if(mounted)await _load(); }
   Future<void> _categoryBudgets() async { await Navigator.push(context,MaterialPageRoute(builder:(_)=>CategoryBudgetsScreen(month:_month))); if(mounted)await _load(); }
-  Widget _financeLink()=>Card(child:ListTile(leading:const Icon(Icons.account_balance_wallet_outlined),title:const Text('সম্পদ ও দায়'),subtitle:Text('নিট সম্পদ ${formatMinor(_portfolio.netWorth)}'),trailing:const Icon(Icons.chevron_right),onTap:_finance));
+  Widget _financeLink()=>Card(child:ListTile(leading:const JewelIcon(icon:Icons.account_balance_wallet_rounded,color:Color(0xFF10B981)),title:const Text('সম্পদ ও দায়'),subtitle:Text('নিট সম্পদ ${formatMinor(_portfolio.netWorth)}'),trailing:const Icon(Icons.chevron_right),onTap:_finance));
   List<Widget> _dashboard() {
     final income = _sum(_monthly,TxnType.income),expense = _sum(_monthly,TxnType.expense);
     final balance = _sum(_all,TxnType.income)-_sum(_all,TxnType.expense);
@@ -170,10 +171,10 @@ class _HomeScreenState extends State<HomeScreen> {
     BalanceCard(balance:_portfolio.netWorth,label:'নিট সম্পদ',caption:'আপনার সম্পদ থেকে দায় বাদ দিয়ে'),
     const SizedBox(height:8),HealthCard(income:_sum(_monthly,TxnType.income),expense:_sum(_monthly,TxnType.expense),portfolio:_portfolio),
     _monthPicker(),_budgetCard(),
-    Card(child:ListTile(leading:const Icon(Icons.pie_chart_outline),title:const Text('ক্যাটাগরি অনুযায়ী বাজেট'),trailing:const Icon(Icons.chevron_right),onTap:_categoryBudgets)),
+    Card(child:ListTile(leading:const JewelIcon(icon:Icons.pie_chart_rounded,color:Color(0xFF9B77F3)),title:const Text('ক্যাটাগরি অনুযায়ী বাজেট'),trailing:const Icon(Icons.chevron_right),onTap:_categoryBudgets)),
     _financeLink(),
     AllocationCard(portfolio:_portfolio,onOpen:_finance),
-    Card(child:ListTile(leading:const Icon(Icons.savings_outlined),title:const Text('সঞ্চয়'),subtitle:const Text('DPS, FDR ও সঞ্চয়পত্র'),trailing:const Icon(Icons.chevron_right),onTap:() async {await Navigator.push(context,MaterialPageRoute(builder:(_)=>const FinanceScreen(savingsOnly:true)));if(mounted)await _load();})),
+    Card(child:ListTile(leading:const JewelIcon(icon:Icons.savings_rounded,color:Color(0xFFE5A52E)),title:const Text('সঞ্চয়'),subtitle:const Text('DPS, FDR ও সঞ্চয়পত্র'),trailing:const Icon(Icons.chevron_right),onTap:() async {await Navigator.push(context,MaterialPageRoute(builder:(_)=>const FinanceScreen(savingsOnly:true)));if(mounted)await _load();})),
   ];
   List<Widget> _goalsTab() => [_title('ইচ্ছা ও সঞ্চয়'),if (_goals.isEmpty) _empty('আপনার প্রথম সঞ্চয়ের লক্ষ্য যোগ করতে নিচের + চাপুন।',Icons.star_outline_rounded),..._goals.map((g) {
     final target = g['target_minor'] as int,saved = g['saved_minor'] as int;
