@@ -69,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   Widget _monthPicker() {
     final cs = Theme.of(context).colorScheme;
-    Widget arrow(String tip,IconData icon,int step) => IconButton.filledTonal(tooltip:tip,visualDensity:VisualDensity.compact,style:IconButton.styleFrom(backgroundColor:cs.surface,side:BorderSide(color:cs.outlineVariant)),onPressed:() { setState(() => _month = DateTime(_month.year,_month.month+step)); _load(); },icon:Icon(icon,size:20));
+    Widget arrow(String tip,IconData icon,int step) => IconButton.filledTonal(tooltip:tip,style:IconButton.styleFrom(backgroundColor:cs.surface,side:BorderSide(color:cs.outlineVariant)),onPressed:() { setState(() => _month = DateTime(_month.year,_month.month+step)); _load(); },icon:Icon(icon,size:20));
     return Padding(padding:const EdgeInsets.symmetric(vertical:14),child:Row(children:[arrow('আগের মাস',Icons.chevron_left,-1),Expanded(child:Text(monthLabel(_month),textAlign:TextAlign.center,style:Theme.of(context).textTheme.titleMedium)),arrow('পরের মাস',Icons.chevron_right,1)]));
   }
   static const _quotes = [
@@ -87,13 +87,13 @@ class _HomeScreenState extends State<HomeScreen> {
   String get _today { final d = DateTime.now(); return '${_weekdays[d.weekday-1]}, ${toBangla('${d.day}')} ${monthNames[d.month-1]} ${toBangla('${d.year}')}'; }
   Future<void> _openSettings() async { await Navigator.push(context,MaterialPageRoute(builder:(_) => Scaffold(appBar:AppBar(title:const Text('সেটিংস')),body:SettingsScreen(onDataChanged:_load)))); if (mounted) await _load(); }
   Future<void> _editNote([Map<String,Object?>? m]) async { await Navigator.push(context,MaterialPageRoute(builder:(_) => ItemEditor(goal:false,item:m))); if (mounted) await _load(); }
-  Widget _title(String text) => Padding(padding:const EdgeInsets.only(top:14,bottom:4),child:Row(children:[Container(width:5,height:24,decoration:BoxDecoration(color:Theme.of(context).colorScheme.primary,borderRadius:BorderRadius.circular(4))),const SizedBox(width:10),Expanded(child:Text(text,style:Theme.of(context).textTheme.headlineSmall))]));
+  Widget _title(String text) => Padding(padding:const EdgeInsets.only(top:14,bottom:4),child:Row(children:[Container(width:5,height:24,decoration:BoxDecoration(color:Theme.of(context).colorScheme.primary,borderRadius:BorderRadius.circular(4))),const SizedBox(width:10),Expanded(child:GradientText(text,style:Theme.of(context).textTheme.headlineSmall))]));
   Widget _header() {
     final cs = Theme.of(context).colorScheme;
     final initial = _profileName.isEmpty ? 'আ' : String.fromCharCode(_profileName.runes.first);
     return Padding(padding:const EdgeInsets.only(top:12),child:Row(children:[
       Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Text(_profileName.isEmpty ? '$_greeting!' : '$_greeting, $_profileName!',maxLines:2,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.headlineSmall?.copyWith(color:cs.primary)),
+        GradientText(_profileName.isEmpty ? '$_greeting!' : '$_greeting, $_profileName!',maxLines:2,style:Theme.of(context).textTheme.headlineSmall),
         Text(_today,style:Theme.of(context).textTheme.bodySmall),
       ])),
       const SizedBox(width:12),
@@ -105,12 +105,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _transaction(Txn t) {
     final income = t.type == TxnType.income;
     final color = income ? AppColors.incomeFor(context) : AppColors.expenseFor(context);
-    final icons = <String,IconData>{'Bazar':Icons.shopping_bag_outlined,'Transport':Icons.directions_bus_outlined,'Bills':Icons.receipt_outlined,'Health':Icons.favorite_border,'Education':Icons.school_outlined,'Salary':Icons.work_outline,'Freelance':Icons.laptop_mac_outlined,'Gift':Icons.card_giftcard_outlined};
+    final style = CategoryStyle.of(t.category,income);
     final amount = Text('${income ? '+' : '−'} ${formatMinor(t.amountMinor)}',style:TextStyle(color:color,fontSize:14,fontWeight:FontWeight.w600));
     return Card(child:InkWell(borderRadius:BorderRadius.circular(20),onTap:() => _editTransaction(t),child:Padding(padding:const EdgeInsets.fromLTRB(14,13,0,13),child:LayoutBuilder(builder:(context,box) {
       final wide = box.maxWidth > 330 && MediaQuery.textScalerOf(context).scale(14) < 19;
       return Row(children:[
-        Container(width:42,height:42,decoration:BoxDecoration(color:color.withValues(alpha:0.10),borderRadius:BorderRadius.circular(13)),child:Icon(icons[t.category] ?? (income ? Icons.south_west_rounded : Icons.north_east_rounded),color:color,size:21)),const SizedBox(width:12),
+        Container(width:44,height:44,decoration:BoxDecoration(color:style.color.withValues(alpha:0.16),borderRadius:BorderRadius.circular(14)),child:Icon(style.icon,color:style.color,size:23)),const SizedBox(width:12),
         Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(categoryLabel(t.category),style:Theme.of(context).textTheme.titleMedium),const SizedBox(height:3),Text('${formatDate(t.date)}${t.note.isEmpty ? '' : ' • ${t.note}'}',maxLines:1,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.bodySmall),if (!wide) ...[const SizedBox(height:5),amount]])),
         if (wide) ...[const SizedBox(width:8),amount],
         PopupMenuButton<String>(tooltip:'লেনদেনের অপশন',icon:Icon(Icons.more_vert,size:19,color:Theme.of(context).colorScheme.onSurfaceVariant),onSelected:(v) { if (v == 'edit') { _editTransaction(t); } else { _delete(t); } },itemBuilder:(_) => const [PopupMenuItem(value:'edit',child:Text('সম্পাদনা')),PopupMenuItem(value:'delete',child:Text('মুছুন'))]),
@@ -151,7 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const SizedBox(height:12),
       FadeSlideIn(index:3,child:tileRow),
       const SizedBox(height:12),
-      FadeSlideIn(index:4,child:QuickActions(onIncome:() => _editTransaction(null,TxnType.income),onExpense:() => _editTransaction(null,TxnType.expense))),
+      FadeSlideIn(index:4,child:QuickAddRow(onIncome:() => _editTransaction(null,TxnType.income),onExpense:() => _editTransaction(null,TxnType.expense))),
       const SizedBox(height:8),
       FadeSlideIn(index:5,child:WeekChartCard(title:'সাপ্তাহিক আয় বনাম ব্যয়',days:week)),
       FadeSlideIn(index:6,child:_budgetCard()),
@@ -200,6 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(value:dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,child:PopScope(canPop:_tab == 0,onPopInvokedWithResult:(didPop,_) { if (!didPop) setState(() => _tab = 0); },child:Scaffold(
       bottomNavigationBar:AppBottomBar(selected:_tab,onSelect:(i) => setState(() => _tab = i)),
       floatingActionButton:switch (_tab) {
+        0 => null,
         4 => FloatingActionButton(heroTag:null,onPressed:() => _editGoal(),tooltip:'নতুন লক্ষ্য',child:const Icon(Icons.add)),
         5 => FloatingActionButton(heroTag:null,onPressed:() => _editNote(),tooltip:'নতুন নোট',child:const Icon(Icons.add)),
         _ => FloatingActionButton(heroTag:null,onPressed:() => _editTransaction(),tooltip:'নতুন লেনদেন',child:const Icon(Icons.add)),
