@@ -122,7 +122,7 @@ class _MovementEditorState extends State<MovementEditor> {
     finally{if(mounted)setState(()=>_busy=false);}
   }
   @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('অ্যাকাউন্ট লেনদেন')),body:Form(key:_form,child:ListView(padding:const EdgeInsets.all(20),children:[
-    const Text('এটি অ্যাকাউন্টের ব্যালেন্স বদলায়। আয় বা ব্যয়ের রেকর্ড প্রয়োজন হলে লেনদেন ট্যাবে আলাদা করে লিখুন।'),const SizedBox(height:20),
+    const Text('এটি শুধু ব্যালেন্স সমন্বয় / ট্রান্সফার। আয় বা ব্যয় হলে নতুন লেনদেন ফর্মে অ্যাকাউন্ট বেছে লিখুন; একই টাকা এখানে আবার যোগ করবেন না।'),const SizedBox(height:20),
     DropdownButtonFormField<String>(initialValue:_type,decoration:const InputDecoration(labelText:'লেনদেনের ধরন'),items:const [DropdownMenuItem(value:'deposit',child:Text('জমা')),DropdownMenuItem(value:'withdraw',child:Text('উত্তোলন')),DropdownMenuItem(value:'transfer',child:Text('অন্য অ্যাকাউন্টে ট্রান্সফার'))],onChanged:(v)=>setState(()=>_type=v!)),const SizedBox(height:16),
     if(_type=='transfer')DropdownButtonFormField<int>(isExpanded:true,initialValue:_target,decoration:const InputDecoration(labelText:'যে অ্যাকাউন্টে যাবে'),items:widget.portfolio.holdings.where((a)=>isAccount(a)&&a['id']!=widget.accountId).map((a)=>DropdownMenuItem(value:number(a,'id'),child:Text(field(a,'title')))).toList(),validator:(v)=>v==null?'একটি অ্যাকাউন্ট দিন':null,onChanged:(v)=>setState(()=>_target=v)),
     const SizedBox(height:16),TextFormField(controller:_amount,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'পরিমাণ (টাকা)'),validator:(v)=>parseMoney(v??'')==null?'সঠিক পরিমাণ দিন':null),
@@ -134,10 +134,11 @@ class AccountHistory extends StatelessWidget {
   final Portfolio portfolio;final Record account;
   const AccountHistory({super.key,required this.portfolio,required this.account});
   @override Widget build(BuildContext context){
-    final rows=portfolio.movements.where((m)=>m['account_id']==account['id']||m['target_id']==account['id']);
-    return Scaffold(appBar:AppBar(title:Text(field(account,'title'))),body:ListView(padding:const EdgeInsets.all(18),children:[Text('বর্তমান ব্যালেন্স ${formatMinor(portfolio.balance(account))}',style:Theme.of(context).textTheme.titleLarge),Text('শুরুর ব্যালেন্স ${formatMinor(number(account,'amount_minor'))}'),const Text('ভুল লেনদেন সংশোধন করতে বিপরীত জমা/উত্তোলন বা ট্রান্সফার লিখুন।'),if(rows.isEmpty)const Padding(padding:EdgeInsets.all(24),child:Text('কোনো লেনদেন নেই।')),...rows.map((m){
-      final incoming=m['target_id']==account['id']||m['type']=='deposit';
-      return Card(child:ListTile(leading:Icon(incoming?Icons.south_west:Icons.north_east),title:Text('${incoming?'+':'−'} ${formatMinor(number(m,'amount_minor'))}'),subtitle:Text('${m['type']=='transfer'?'ট্রান্সফার':incoming?'জমা':'উত্তোলন'} • ${formatDate(DateTime.parse(field(m,'date')))}\n${field(m,'note')}')));
+    final linked=portfolio.transactions.where((t)=>t['account_id']==account['id']).map((t)=><String,Object?>{...t,'linked':true});
+    final rows=[...portfolio.movements.where((m)=>m['account_id']==account['id']||m['target_id']==account['id']),...linked]..sort((a,b)=>field(b,'date').compareTo(field(a,'date')));
+    return Scaffold(appBar:AppBar(title:Text(field(account,'title'))),body:ListView(padding:const EdgeInsets.all(18),children:[Text('বর্তমান ব্যালেন্স ${formatMinor(portfolio.balance(account))}',style:Theme.of(context).textTheme.titleLarge),Text('শুরুর ব্যালেন্স ${formatMinor(number(account,'amount_minor'))}'),const Text('আয়–ব্যয় সংশোধন করুন ইতিহাস ট্যাবে। ব্যালেন্স সমন্বয় / ট্রান্সফার সংশোধনে বিপরীত এন্ট্রি দিন।'),if(rows.isEmpty)const Padding(padding:EdgeInsets.all(24),child:Text('কোনো লেনদেন নেই।')),...rows.map((m){
+      final incoming=m['target_id']==account['id']||m['type']=='deposit'||m['type']=='income';
+      return Card(child:ListTile(leading:Icon(incoming?Icons.south_west:Icons.north_east),title:Text('${incoming?'+':'−'} ${formatMinor(number(m,'amount_minor'))}'),subtitle:Text('${m['linked']==true?(incoming?'আয়':'ব্যয়'):m['type']=='transfer'?'ট্রান্সফার':incoming?'জমা':'উত্তোলন'} • ${formatDate(DateTime.parse(field(m,'date')))}\n${field(m,'note')}')));
     })]));
   }
 }

@@ -20,5 +20,14 @@ class Reminders {
     }
     await _plugin.zonedSchedule(1,'Amar Taka','আজকের আয়–ব্যয়ের হিসাব লিখেছেন?',next,const NotificationDetails(android:AndroidNotificationDetails('ledger_reminder','হিসাবের রিমাইন্ডার',channelDescription:'নিজের নির্ধারিত সময়ে হিসাব লেখার স্মরণ',importance:Importance.defaultImportance)),androidScheduleMode:AndroidScheduleMode.inexactAllowWhileIdle,matchDateTimeComponents:day == null ? DateTimeComponents.time : DateTimeComponents.dayOfMonthAndTime);
   }
+  static Future<void> backupReminder(bool enabled) async {
+    await _plugin.cancel(2);
+    if(!enabled)return;
+    final android=_plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if(await android?.requestNotificationsPermission()==false)throw StateError('Notification permission দিন।');
+    final location=tz.getLocation('Asia/Dhaka'),now=tz.TZDateTime.now(tz.getLocation('Asia/Dhaka'));
+    final next=tz.TZDateTime(location,now.year,now.month,now.day+7,20);
+    await _plugin.zonedSchedule(2,'Amar Taka','আপনার হিসাবের JSON backup নিরাপদ জায়গায় রাখুন।',next,const NotificationDetails(android:AndroidNotificationDetails('backup_reminder','Backup reminder',importance:Importance.defaultImportance)),androidScheduleMode:AndroidScheduleMode.inexactAllowWhileIdle,matchDateTimeComponents:DateTimeComponents.dayOfWeekAndTime);
+  }
   static Future<void> cancel() async => _plugin.cancel(1);
 }

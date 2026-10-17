@@ -9,9 +9,11 @@ class ItemEditor extends StatefulWidget {
 class _ItemEditorState extends State<ItemEditor> {
   final _form = GlobalKey<FormState>();
   final _title = TextEditingController(),_body = TextEditingController(),_target = TextEditingController(),_saved = TextEditingController();
+  DateTime? _deadline;
   bool _busy = false; String? _error;
   @override void initState() {
     super.initState(); final m = widget.item;
+    _deadline=DateTime.tryParse(m?['deadline'] as String? ?? '');
     _title.text = m?['title'] as String? ?? ''; _body.text = m?[widget.goal ? 'note' : 'body'] as String? ?? '';
     _target.text = m == null || !widget.goal ? '' : moneyInput(m['target_minor'] as int);
     _saved.text = m == null || !widget.goal ? '0' : moneyInput(m['saved_minor'] as int);
@@ -21,7 +23,7 @@ class _ItemEditorState extends State<ItemEditor> {
     if (_busy || !_form.currentState!.validate()) return;
     setState(() => _busy = true);
     try {
-      await DbHelper.instance.saveItem(widget.goal ? 'goals' : 'notes',widget.goal ? {'title':_title.text.trim(),'note':_body.text.trim(),'target_minor':parseMoney(_target.text)!,'saved_minor':_savedValue()!} : {'title':_title.text.trim(),'body':_body.text.trim(),'updated':DateTime.now().toIso8601String()},id:widget.item?['id'] as int?);
+      await DbHelper.instance.saveItem(widget.goal ? 'goals' : 'notes',widget.goal ? {'title':_title.text.trim(),'note':_body.text.trim(),'target_minor':parseMoney(_target.text)!,'saved_minor':_savedValue()!,'deadline':_deadline?.toIso8601String()??'','plan_start':_deadline==null?'':((widget.item?['deadline']==_deadline!.toIso8601String() && widget.item?['plan_start']!='')?widget.item!['plan_start']:DateTime.now().toIso8601String()),'plan_saved':widget.item?['deadline']==_deadline?.toIso8601String()?(widget.item?['plan_saved']??_savedValue()!):_savedValue()!} : {'title':_title.text.trim(),'body':_body.text.trim(),'updated':DateTime.now().toIso8601String()},id:widget.item?['id'] as int?);
       if (mounted) Navigator.pop(context,true);
     } catch (_) { if (mounted) setState(() => _error = 'সংরক্ষণ হয়নি। আবার চেষ্টা করুন।'); }
     finally { if (mounted) setState(() => _busy = false); }
@@ -32,6 +34,8 @@ class _ItemEditorState extends State<ItemEditor> {
     if (widget.goal) ...[
       const SizedBox(height:14),TextFormField(controller:_target,enabled:!_busy,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'লক্ষ্য (টাকা)'),validator:(v) => parseMoney(v ?? '') == null ? 'সঠিক পরিমাণ দিন' : null),
       const SizedBox(height:14),TextFormField(controller:_saved,enabled:!_busy,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'এখন পর্যন্ত জমা (টাকা)'),validator:(v) => _savedValue() == null ? 'শূন্য অথবা সঠিক পরিমাণ দিন' : null),
+      OutlinedButton.icon(icon:const Icon(Icons.event),label:Text(_deadline==null?'লক্ষ্য পূরণের তারিখ দিন':formatDate(_deadline!)),onPressed:_busy?null:() async {final date=await showDatePicker(context:context,initialDate:_deadline??DateTime.now().add(const Duration(days:365)),firstDate:DateTime(1900),lastDate:DateTime(2200));if(date!=null && mounted){if(!date.isAfter(DateTime.now())){setState(()=>_error='ভবিষ্যতের তারিখ দিন।');return;}setState(()=>_deadline=date);}}),
+      if(_deadline!=null) TextButton(onPressed:_busy?null:()=>setState(()=>_deadline=null),child:const Text('পরিকল্পনার তারিখ সরান')),
       const Padding(padding:EdgeInsets.symmetric(vertical:16),child:Text('এটি লক্ষ্যের অগ্রগতি। আয়–ব্যয়ের হিসাবে স্বয়ংক্রিয় লেনদেন যোগ হবে না।')),
     ],
     const SizedBox(height:14),TextFormField(controller:_body,enabled:!_busy,maxLines:widget.goal ? 3 : 10,maxLength:widget.goal ? 2000 : 10000,decoration:InputDecoration(labelText:widget.goal ? 'বিবরণ' : 'নোট লিখুন')),

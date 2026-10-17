@@ -90,8 +90,8 @@ class FinanceMath {
 }
 
 class Portfolio {
-  final List<Record> holdings,movements;
-  const Portfolio({this.holdings=const [],this.movements=const []});
+  final List<Record> holdings,movements,transactions;
+  const Portfolio({this.holdings=const [],this.movements=const [],this.transactions=const []});
   List<Record> ofKind(String kind)=>holdings.where((r)=>r['kind']==kind).toList();
   int balance(Record account) {
     var total=number(account,'amount_minor');
@@ -99,6 +99,7 @@ class Portfolio {
       if(m['account_id']==account['id']) total+=m['type']=='deposit'?number(m,'amount_minor'):-number(m,'amount_minor');
       if(m['target_id']==account['id']) total+=number(m,'amount_minor');
     }
+    for(final t in transactions.where((t)=>t['account_id']==account['id'])) { total+=t['type']=='income'?number(t,'amount_minor'):-number(t,'amount_minor'); }
     return total;
   }
   int value(Record r) {
@@ -117,7 +118,7 @@ class PortfolioStore {
   final Database database;
   PortfolioStore(this.database);
   static Future<PortfolioStore> open() async=>PortfolioStore(await DbHelper.instance.db);
-  Future<Portfolio> read() async=>Portfolio(holdings:await database.query('holdings',orderBy:'id DESC'),movements:await database.query('account_movements',orderBy:'date DESC, id DESC'));
+  Future<Portfolio> read() async=>Portfolio(holdings:await database.query('holdings',orderBy:'id DESC'),movements:await database.query('account_movements',orderBy:'date DESC, id DESC'),transactions:await database.query('transactions',columns:['id','account_id','type','amount_minor','category','note','date']));
   Future<int> save(Record record,{int? id}) async {
     final clean=FinanceValidation.holding(record);
     return database.transaction((txn) async {
@@ -126,13 +127,22 @@ class PortfolioStore {
       if(old.isEmpty || old.first['kind']!=clean['kind'])throw const FormatException('হিসাবটি পাওয়া যায়নি।');
       if(isAccount(clean)) {
         final moves=await txn.query('account_movements',where:'account_id=? OR target_id=?',whereArgs:[id,id]);
-        if(Portfolio(movements:moves).balance({...clean,'id':id})<0)throw const FormatException('ব্যালেন্স শূন্যের নিচে হতে পারে না।');
+        if(Portfolio(movements:moves,transactions:await txn.query('transactions',columns:['account_id','type','amount_minor'])).balance({...clean,'id':id})<0)throw const FormatException('ব্যালেন্স শূন্যের নিচে হতে পারে না।');
       }
-      await txn.update('holdings',clean,where:'id=?',whereArgs:[id]);return id;
+      if(isLoan(clean)) {
+        final payments=await txn.query('loan_payments',where:'loan_id=?',whereArgs:[id]);
+        if(payments.fold<int>(0,(s,p)=>s+number(p,'amount_minor'))>number(clean,'value_minor')) throw const FormatException('রেকর্ড করা পরিশোধের চেয়ে মোট পরিশোধ কম হতে পারে না।');
+      }
+      await txn.update('holdings',clean,where:'id=?',whereArgs:[id]);
+      await DbHelper.checkAccounts(txn);return id;
     });
   }
   Future<void> delete(int id) async=>database.transaction((txn) async {
     if((await txn.query('account_movements',where:'account_id=? OR target_id=?',whereArgs:[id,id],limit:1)).isNotEmpty)throw const FormatException('এই অ্যাকাউন্টে লেনদেন আছে। ইতিহাসসহ অ্যাকাউন্ট রাখুন।');
+    for(final table in ['transactions','quick_entries','recurring']) {
+      if((await txn.query(table,where:'account_id=?',whereArgs:[id],limit:1)).isNotEmpty) throw const FormatException('অ্যাকাউন্টটি লেনদেন বা শর্টকাটে ব্যবহৃত হচ্ছে।');
+    }
+    await txn.delete('loan_payments',where:'loan_id=?',whereArgs:[id]);
     await txn.delete('holdings',where:'id=?',whereArgs:[id]);
   });
   Future<void> move(Record record) async {
@@ -140,7 +150,7 @@ class PortfolioStore {
     await database.transaction((txn) async {
       final accounts=await txn.query('holdings',where:'kind IN (?,?)',whereArgs:['cash','bank']);
       if(!accounts.any((a)=>a['id']==m['account_id']) || (m['type']=='transfer' && !accounts.any((a)=>a['id']==m['target_id'])))throw const FormatException('অ্যাকাউন্ট পাওয়া যায়নি।');
-      final portfolio=Portfolio(holdings:accounts,movements:await txn.query('account_movements'));
+      final portfolio=Portfolio(holdings:accounts,movements:await txn.query('account_movements'),transactions:await txn.query('transactions',columns:['account_id','type','amount_minor']));
       final source=accounts.firstWhere((a)=>a['id']==m['account_id']);
       if(m['type']!='deposit' && portfolio.balance(source)<number(m,'amount_minor'))throw const FormatException('অ্যাকাউন্টে যথেষ্ট টাকা নেই।');
       if(m['type']=='deposit' && portfolio.balance(source)+number(m,'amount_minor')>maxMinor)throw const FormatException('ব্যালেন্স সীমা ছাড়িয়েছে।');
@@ -148,7 +158,7 @@ class PortfolioStore {
       await txn.insert('account_movements',m);
     });
   }
-  Future<void> repay(int id,int amount) async {
+  Future<void> repay(int id,int amount,{DateTime? date,String note=''}) async {
     FinanceValidation.integer(amount,min:1);
     await database.transaction((txn) async {
       final rows=await txn.query('holdings',where:'id=? AND kind IN (?,?)',whereArgs:[id,'lent','borrowed']);
@@ -156,6 +166,7 @@ class PortfolioStore {
       final r=rows.first,paid=number(r,'value_minor')+amount;
       if(paid>number(r,'amount_minor'))throw const FormatException('বকেয়ার বেশি টাকা দেওয়া হয়েছে।');
       await txn.update('holdings',{'value_minor':paid},where:'id=?',whereArgs:[id]);
+      await txn.insert('loan_payments',{'loan_id':id,'amount_minor':amount,'date':(date??DateTime.now()).toIso8601String(),'note':note});
     });
   }
   Future<void> payInstallment(int id) async=>database.transaction((txn) async {

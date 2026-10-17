@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../database/db_helper.dart';
+import '../services/feature_service.dart';
+import '../services/home_widget.dart';
 import '../models/transaction.dart';
 import '../utils/formatters.dart';
 import '../theme/app_theme.dart';
@@ -35,16 +37,22 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Txn> _all = []; List<Map<String,Object?>> _goals = []; List<Map<String,Object?>> _notes = [];
   int _quote = DateTime.now().day+DateTime.now().month*31;
   final _searchCtl = TextEditingController();
-  @override void dispose() { _searchCtl.dispose(); super.dispose(); }
+  void _widgetChanged(){if(widget.loadData==null)_load();}
+  @override void dispose() { LedgerWidget.changed.removeListener(_widgetChanged); _searchCtl.dispose(); super.dispose(); }
   Portfolio _portfolio=const Portfolio(); String _profileName='';
   int? _budget; String _search = ''; TxnType? _kind;
   bool _loading = true,_busy = false; String? _error;
   int _request = 0;
-  @override void initState() { super.initState(); _load(); }
+  @override void initState() { super.initState(); LedgerWidget.changed.addListener(_widgetChanged); _load(); }
   Future<void> _load() async {
     final request = ++_request;
     try {
+      if(widget.loadData==null) {
+        final errors=await FeatureService.postDue(await DbHelper.instance.db);
+        if(errors.isNotEmpty && mounted) _message('কিছু মাসিক এন্ট্রি হয়নি। সেটিংস → আরও সুবিধা দেখুন।');
+      }
       final data = widget.loadData == null ? LedgerOverview(transactions:await DbHelper.instance.getTransactions(),goals:await DbHelper.instance.items('goals'),notes:await DbHelper.instance.items('notes'),budget:await DbHelper.instance.budget(_month),portfolio:await (await PortfolioStore.open()).read(),profileName:await DbHelper.instance.setting('profile_name')??'') : await widget.loadData!(_month);
+      if(widget.loadData==null) await LedgerWidget.refresh();
       final all = data.transactions; final goals = data.goals; final budget = data.budget;
       if (!mounted || request != _request) return;
       setState(() { _all = all; _notes = data.notes; _portfolio=data.portfolio; _profileName=data.profileName; _goals = goals; _budget = budget; _loading = false; _error = null; });
@@ -114,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
         JewelIcon(icon:style.icon,color:style.color),const SizedBox(width:12),
         Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(categoryLabel(t.category),style:Theme.of(context).textTheme.titleMedium),const SizedBox(height:3),Text('${formatDate(t.date)}${t.note.isEmpty ? '' : ' • ${t.note}'}',maxLines:1,overflow:TextOverflow.ellipsis,style:Theme.of(context).textTheme.bodySmall),if (!wide) ...[const SizedBox(height:5),amount]])),
         if (wide) ...[const SizedBox(width:8),amount],
-        PopupMenuButton<String>(tooltip:'লেনদেনের অপশন',icon:Icon(Icons.more_vert,size:19,color:Theme.of(context).colorScheme.onSurfaceVariant),onSelected:(v) { if (v == 'edit') { _editTransaction(t); } else { _delete(t); } },itemBuilder:(_) => const [PopupMenuItem(value:'edit',child:Text('সম্পাদনা')),PopupMenuItem(value:'delete',child:Text('মুছুন'))]),
+        PopupMenuButton<String>(tooltip:'লেনদেনের অপশন',icon:Icon(Icons.more_vert,size:19,color:Theme.of(context).colorScheme.onSurfaceVariant),onSelected:(v) { if (v == 'edit') { _editTransaction(t); } else if(v=='duplicate') { _editTransaction(Txn(amountMinor:t.amountMinor,category:t.category,note:t.note,date:DateTime.now(),type:t.type,accountId:t.accountId)); } else { _delete(t); } },itemBuilder:(_) => const [PopupMenuItem(value:'edit',child:Text('সম্পাদনা')),PopupMenuItem(value:'duplicate',child:Text('আবার যোগ করুন')),PopupMenuItem(value:'delete',child:Text('মুছুন'))]),
       ]);
     }))));
   }
@@ -178,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
   List<Widget> _goalsTab() => [_title('ইচ্ছা ও সঞ্চয়'),if (_goals.isEmpty) _empty('আপনার প্রথম সঞ্চয়ের লক্ষ্য যোগ করতে নিচের + চাপুন।',Icons.star_outline_rounded),..._goals.map((g) {
     final target = g['target_minor'] as int,saved = g['saved_minor'] as int;
-    return Card(child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[Expanded(child:Text(g['title'] as String,style:Theme.of(context).textTheme.titleMedium)),IconButton(tooltip:'লক্ষ্য সম্পাদনা',onPressed:() => _editGoal(g),icon:const Icon(Icons.edit_outlined)),IconButton(tooltip:'লক্ষ্য মুছুন',onPressed:() async { if (!await _confirm('এই সঞ্চয়ের লক্ষ্য মুছে যাবে।')) return; try { await DbHelper.instance.deleteItem('goals',g['id'] as int); await _load(); } catch (_) { _message('মুছে ফেলা যায়নি।'); } },icon:const Icon(Icons.delete_outline))]),Text('${formatMinor(saved)} / ${formatMinor(target)}'),const SizedBox(height:12),LinearProgressIndicator(value:(saved/target).clamp(0.0,1.0),minHeight:7,borderRadius:BorderRadius.circular(5)),const SizedBox(height:10),Text(saved >= target ? 'লক্ষ্য পূরণ হয়েছে!' : 'আরও ${formatMinor(target-saved)} প্রয়োজন'),if ((g['note'] as String).isNotEmpty) Text(g['note'] as String)])));
+    return Card(child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[Expanded(child:Text(g['title'] as String,style:Theme.of(context).textTheme.titleMedium)),IconButton(tooltip:'লক্ষ্য সম্পাদনা',onPressed:() => _editGoal(g),icon:const Icon(Icons.edit_outlined)),IconButton(tooltip:'লক্ষ্য মুছুন',onPressed:() async { if (!await _confirm('এই সঞ্চয়ের লক্ষ্য মুছে যাবে।')) return; try { await DbHelper.instance.deleteItem('goals',g['id'] as int); await _load(); } catch (_) { _message('মুছে ফেলা যায়নি।'); } },icon:const Icon(Icons.delete_outline))]),Text('${formatMinor(saved)} / ${formatMinor(target)}'),const SizedBox(height:12),LinearProgressIndicator(value:(saved/target).clamp(0.0,1.0),minHeight:7,borderRadius:BorderRadius.circular(5)),const SizedBox(height:10),Text(saved >= target ? 'লক্ষ্য পূরণ হয়েছে!' : 'আরও ${formatMinor(target-saved)} প্রয়োজন'),if((g['deadline'] as String? ?? '').isNotEmpty) Padding(padding:const EdgeInsets.only(top:8),child:Text(FeatureService.goalPlan(g))),if ((g['note'] as String).isNotEmpty) Text(g['note'] as String)])));
   })];
   List<Widget> _notesTab() => [_title('নোট'),if (_notes.isEmpty) _empty('প্রথম নোট লিখতে নিচের + চাপুন।',Icons.edit_note_outlined),..._notes.map((m) => Card(child:ListTile(onTap:() => _editNote(m),title:Text(m['title'] as String),subtitle:Text(m['body'] as String,maxLines:3,overflow:TextOverflow.ellipsis),trailing:IconButton(tooltip:'নোট মুছুন',icon:const Icon(Icons.delete_outline),onPressed:() async { if (!await _confirm('এই নোটটি মুছে যাবে।')) return; try { await DbHelper.instance.deleteItem('notes',m['id'] as int); await _load(); } catch (_) { _message('মুছে ফেলা যায়নি।'); } }))))];
   List<Widget> _reports() {

@@ -63,6 +63,10 @@ main = app / 'android/app/src/main'
             <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme"/>
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity>
+        <receiver android:name=".LedgerWidgetProvider" android:exported="false" android:label="Amar Taka">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/ledger_widget_info"/>
+        </receiver>
         <meta-data android:name="flutterEmbedding" android:value="2"/>
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"/>
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
@@ -128,6 +132,10 @@ class MainActivity: FlutterFragmentActivity() {
     }
 }
 ''')
+# Native widget and Flutter bridge.
+for name in ['MainActivity.kt', 'LedgerWidgetProvider.kt']:
+    shutil.copy2(root / 'source/android' / name, activity.parent / name)
+shutil.copytree(root / 'source/android/res', res, dirs_exist_ok=True)
 # local_auth requires an AppCompat launch theme on Android 8 and earlier.
 for style in res.glob('values*/styles.xml'):
     value = style.read_text().replace('@android:style/Theme.Light.NoTitleBar', 'Theme.AppCompat.DayNight.NoActionBar').replace('@android:style/Theme.Black.NoTitleBar', 'Theme.AppCompat.DayNight.NoActionBar')

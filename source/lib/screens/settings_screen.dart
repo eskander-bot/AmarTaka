@@ -11,6 +11,8 @@ import '../finance/finance_screen.dart';
 import '../services/reminders.dart';
 import '../utils/formatters.dart';
 import 'item_editor.dart';
+import 'features_screen.dart';
+import '../services/home_widget.dart';
 
 class SettingsScreen extends StatefulWidget {
   final Future<void> Function() onDataChanged;
@@ -20,8 +22,15 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _busy = false;
   String _reminder = 'বন্ধ';
-  bool _biometric=false;
-  @override void initState() { super.initState(); _loadReminder(); _loadBiometric(); }
+  bool _biometric=false,_backupReminder=false; String _lastBackup='এখনো রাখা হয়নি';
+  @override void initState() { super.initState(); _loadReminder(); _loadBiometric(); _loadBackup(); }
+  Future<void> _loadBackup() async {
+    try {
+      final enabled=await DbHelper.instance.setting('backup_reminder')=='on';
+      final last=DateTime.tryParse(await DbHelper.instance.setting('last_backup')??'');
+      if(mounted)setState((){_backupReminder=enabled;_lastBackup=last==null?'এখনো রাখা হয়নি':formatDate(last);});
+    } catch(_) { /* Retry from settings. */ }
+  }
   Future<void> _loadBiometric() async {try{final v=await Biometrics.enabled();if(mounted)setState(()=>_biometric=v);}catch(_){}}
   Future<void> _biometricToggle() async {
     if(!preferences.pinEnabled){_message('আগে PIN চালু করুন; biometric না হলে PIN ব্যবহার করবেন।');return;}
@@ -48,19 +57,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _run(Future<void> Function() action) async {
     if (_busy) return;
     setState(() => _busy = true);
-    try { await action(); } catch (_) { _message('কাজটি সম্পন্ন হয়নি। ফাইল, permission বা PIN যাচাই করে আবার চেষ্টা করুন।'); }
+    try { await action(); } catch (e) { _message(e is FormatException?e.message:'কাজটি সম্পন্ন হয়নি। ফাইল, permission বা PIN যাচাই করে আবার চেষ্টা করুন।'); }
     finally { if (mounted) setState(() => _busy = false); }
   }
   Future<void> _export(bool csv) async {
     final content = csv ? await Backup.exportCsv() : await Backup.exportJson();
     final result = await FilePicker.platform.saveFile(dialogTitle:'Backup সংরক্ষণ করুন',fileName:'amar-taka-${DateTime.now().millisecondsSinceEpoch}.${csv ? 'csv' : 'json'}',bytes:Uint8List.fromList(utf8.encode(content)));
-    if (result != null) _message('ফাইল সংরক্ষণ হয়েছে।');
+    if(result!=null){
+      if(!csv){
+        await DbHelper.instance.setSetting('last_backup',DateTime.now().toIso8601String());await _loadBackup();
+        if(_backupReminder){try{await Reminders.backupReminder(true);}catch(_){_message('Backup রাখা হয়েছে; notification reminder চালু হয়নি।');}}
+      }
+      _message('ফাইল সংরক্ষণ হয়েছে।');
+    }
   }
   Future<void> _restore() async {
     final result = await FilePicker.platform.pickFiles(type:FileType.custom,allowedExtensions:['json'],withData:true);
     if (result == null || !mounted) return;
     final bytes = result.files.single.bytes;
-    if (bytes == null || bytes.length > 10 * 1024 * 1024) throw const FormatException('Invalid size');
+    if (bytes == null || bytes.length > 64 * 1024 * 1024) throw const FormatException('Invalid size');
     final text = utf8.decode(bytes); final data = Backup.validate(text);
     if (!mounted) return;
     final ok = await showDialog<bool>(context:context,builder:(ctx) => AlertDialog(title:const Text('বর্তমান হিসাব প্রতিস্থাপন করবেন?'),content:Text('এই ফাইলে ${toBangla('${data['transactions']!.length}')}টি লেনদেন আছে।\n\nবর্তমান লেনদেন, সম্পদ, অ্যাকাউন্ট, ধার, বাজেট, লক্ষ্য ও নোটের জায়গায় ফাইলের হিসাব আসবে। পুরোনো backup-এ নতুন হিসাবগুলো না থাকলে সেগুলো খালি হবে। আগে নিজের বর্তমান JSON backup রাখুন। PIN বদলাবে না।'),actions:[TextButton(onPressed:() => Navigator.pop(ctx,false),child:const Text('বাদ দিন')),FilledButton(onPressed:() => Navigator.pop(ctx,true),child:const Text('প্রতিস্থাপন করুন'))]));
@@ -72,7 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final input = await Navigator.push<String>(context,MaterialPageRoute(builder:(_) => PinEditor(removing:enabled)));
     if (input == null) return;
     if (enabled) { await AppLock.remove(input); } else { await AppLock.set(input); }
-    await preferences.refreshPin(); await _loadBiometric(); if (mounted) setState(() {});
+    await preferences.refreshPin(); await LedgerWidget.refresh(); await _loadBiometric(); if (mounted) setState(() {});
     _message(enabled ? 'PIN বন্ধ হয়েছে।' : 'PIN চালু হয়েছে।');
   }
   Future<void> _remind() async {
@@ -90,6 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
   @override Widget build(BuildContext context) => AbsorbPointer(absorbing:_busy,child:ListView(padding:const EdgeInsets.all(18),children:[
     if (_busy) const LinearProgressIndicator(),
+    Card(child:ListTile(leading:const Icon(Icons.auto_awesome_outlined),title:const Text('আরও সুবিধা'),subtitle:const Text('দ্রুত এন্ট্রি, মাসিক আয়–ব্যয়, ধার ও PDF রিপোর্ট'),trailing:const Icon(Icons.chevron_right),onTap:()async{await Navigator.push(context,MaterialPageRoute(builder:(_)=>const FeaturesScreen()));await widget.onDataChanged();})),
     Card(child:ListTile(leading:const Icon(Icons.account_balance_wallet_outlined),title:const Text('সম্পদ ও দায়'),subtitle:const Text('ব্যাংক, ক্যাশ, DPS, FDR, বিনিয়োগ, ধার–দেনা'),trailing:const Icon(Icons.chevron_right),onTap:()async{await Navigator.push(context,MaterialPageRoute(builder:(_)=>const FinanceScreen()));await widget.onDataChanged();})),
     Card(child:ListTile(leading:const Icon(Icons.person_outline),title:const Text('আপনার নাম'),onTap:()=>_run(_profile))),
     SwitchListTile(title:const Text('Fingerprint / Face lock'),subtitle:const Text('PIN চালু থাকতে হবে; ফোনের biometric ব্যবহার হবে।'),value:_biometric,onChanged:(_)=>_run(_biometricToggle)),
@@ -101,10 +117,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     const SizedBox(height:20),const Text('আপনার ডেটা',style:TextStyle(fontSize:20,fontWeight:FontWeight.w600)),
     const Padding(padding:EdgeInsets.symmetric(vertical:12),child:Text('JSON-এ সম্পূর্ণ backup; CSV-তে শুধু লেনদেনের রিপোর্ট। Export করা ফাইলে PIN বা encryption থাকে না—নিজের নিরাপদ জায়গায় রাখুন।')),
     Card(child:Column(children:[ListTile(leading:const Icon(Icons.save_alt),title:const Text('JSON backup রাখুন'),onTap:() => _run(() => _export(false))),ListTile(leading:const Icon(Icons.table_view_outlined),title:const Text('CSV রিপোর্ট নিন'),onTap:() => _run(() => _export(true))),ListTile(leading:const Icon(Icons.restore),title:const Text('JSON backup ফিরিয়ে আনুন'),onTap:() => _run(_restore))])),
+    SwitchListTile(title:const Text('সাপ্তাহিক backup reminder'),subtitle:Text('শেষ JSON backup: $_lastBackup\nপ্রতি সপ্তাহে বাংলাদেশ সময় রাত ৮টা।'),value:_backupReminder,onChanged:(v)=>_run(()async{await Reminders.init();await Reminders.backupReminder(v);await DbHelper.instance.setSetting('backup_reminder',v?'on':'off');await _loadBackup();})),
+    const Card(child:ListTile(leading:Icon(Icons.widgets_outlined),title:Text('হোম-স্ক্রিন উইজেট'),subtitle:Text('ফোনের হোম-স্ক্রিনে চেপে ধরুন → Widgets → Amar Taka। আয় / ব্যয় চাপলে সরাসরি এন্ট্রির ফর্ম খুলবে। PIN থাকলে আগে আনলক করতে হবে। উইজেটে তারিখ দেখুন: নতুন দিনে Android-এর আপডেট আসতে কিছুটা সময় লাগতে পারে।'))),
     TextButton.icon(onPressed:()=>_run(_clearData),icon:const Icon(Icons.delete_forever_outlined),label:const Text('সব হিসাব মুছুন')),
-    const SizedBox(height:24),const Text('Amar Taka',style:TextStyle(fontSize:24,fontWeight:FontWeight.bold)),const Text('by MEskander • 0.4.0'),const SizedBox(height:12),
+    const SizedBox(height:24),const Text('Amar Taka',style:TextStyle(fontSize:24,fontWeight:FontWeight.bold)),const Text('by MEskander • 0.5.0'),const SizedBox(height:12),
     const Text('কোনো লগইন, ব্যাংক সংযোগ বা server লাগে না। হিসাব ফোনের app storage-এ থাকে। PIN অ্যাপ খোলা নিয়ন্ত্রণ করে; database নিজে encrypt করা নয়। অ্যাপ uninstall করলে local data মুছে যাবে।'),
-    TextButton(onPressed:() => showLicensePage(context:context,applicationName:'Amar Taka',applicationVersion:'0.4.0',applicationLegalese:'by MEskander'),child:const Text('ওপেন সোর্স লাইসেন্স')),
+    TextButton(onPressed:() => showLicensePage(context:context,applicationName:'Amar Taka',applicationVersion:'0.5.0',applicationLegalese:'by MEskander'),child:const Text('ওপেন সোর্স লাইসেন্স')),
   ]));
 }
 class PinEditor extends StatefulWidget {

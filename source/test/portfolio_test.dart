@@ -10,7 +10,7 @@ Record movement(int source,{String type='transfer',int? target,int amount=25000}
 void main(){
   sqfliteFfiInit();
   late Database db;late PortfolioStore store;
-  setUp(()async{db=await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);await DbHelper.create(db,3);store=PortfolioStore(db);});
+  setUp(()async{db=await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);await DbHelper.create(db,4);store=PortfolioStore(db);});
   tearDown(()async=>db.close());
   test('Transfers conserve net worth and failed withdrawals change neither account',()async{
     final a=await store.save(holding('cash')),b=await store.save(holding('bank',amount:50000));
@@ -47,7 +47,7 @@ void main(){
   test('Schema 2 migrates without losing transactions and old backups stay readable',()async{
     await db.close();db=await databaseFactoryFfi.openDatabase(inMemoryDatabasePath);await DbHelper.create(db,2);
     await db.insert('transactions',{'amount_minor':12345,'category':'Bazar','note':'keep','date':'2026-06-01T00:00:00.000','type':'expense'});
-    await DbHelper.upgrade(db,2,3);expect((await db.query('transactions')).single['amount_minor'],12345);
+    await DbHelper.upgrade(db,2,4);expect((await db.query('transactions')).single['amount_minor'],12345);
     expect(await db.query('holdings'),isEmpty);
     final root=jsonDecode(await Backup.exportJson(database:db)) as Map;root['schema']=2;root.remove('holdings');root.remove('account_movements');root.remove('category_budgets');
     expect(Backup.validate(jsonEncode(root))['holdings'],isEmpty);
